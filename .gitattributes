@@ -1,0 +1,7 @@
+# Unreal varliklari ikili dosyadir
+*.uasset binary
+*.umap binary
+*.png binary
+*.wav binary
+*.fbx binary
+* text=auto

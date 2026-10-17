@@ -1,0 +1,17 @@
+# Unreal Engine - derlenen / otomatik olusan klasorler
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+.vs/
+.vscode/
+.idea/
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+Tools/__pycache__/
+*.pyc
