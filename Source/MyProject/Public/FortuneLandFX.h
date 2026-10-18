@@ -13,12 +13,12 @@ class UStaticMesh;
 class UMaterialInterface;
 
 UCLASS(NotBlueprintable)
-class MYPROJECT_API AFortuneLandFX : public AActor
+class MYPROJECT_API AFortuneLandFXActor : public AActor
 {
 	GENERATED_BODY()
 
 public:
-	AFortuneLandFX();
+	AFortuneLandFXActor();
 
 	virtual void Tick(float DeltaSeconds) override;
 

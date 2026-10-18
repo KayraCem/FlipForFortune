@@ -52,6 +52,18 @@ enum class EFortunePassiveType : uint8
 	BonusXP              // Atis basina +PassiveValue ekstra XP
 };
 
+/** Coin'in dis sekli. */
+UENUM(BlueprintType)
+enum class EFortuneCoinShape : uint8
+{
+	Round,
+	Octagon,
+	Hexagon,
+	Decagon,
+	Scalloped,   // dilimli kenar
+	Gear         // disli
+};
+
 /** Coin masaya indiginde cikan hazir efekt. */
 UENUM(BlueprintType)
 enum class EFortuneLandFX : uint8

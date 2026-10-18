@@ -17,6 +17,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Fortune")
 	TSubclassOf<class UUserWidget> HUDWidgetClass;
 
+	/** Oyun acilinca ana menu gosterilsin mi. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Fortune")
+	bool bShowMainMenu = true;
+
 	/** Tam ekran menu acikken coin atma ve HUD kapanir. */
 	UFUNCTION(BlueprintCallable, Category = "Fortune")
 	void SetMenuOpen(bool bOpen);

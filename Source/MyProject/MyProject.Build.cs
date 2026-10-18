@@ -8,7 +8,7 @@ public class MyProject : ModuleRules
 
 		PublicDependencyModuleNames.AddRange(new string[]
 		{
-			"Core", "CoreUObject", "Engine", "InputCore", "DeveloperSettings", "Niagara", "UMG", "Slate", "SlateCore"
+			"Core", "CoreUObject", "Engine", "InputCore", "DeveloperSettings", "Niagara", "UMG", "Slate", "SlateCore", "ProceduralMeshComponent"
 		});
 	}
 }

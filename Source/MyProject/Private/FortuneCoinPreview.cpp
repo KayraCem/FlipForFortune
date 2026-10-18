@@ -1,5 +1,7 @@
 #include "FortuneCoinPreview.h"
 #include "FortuneCoinData.h"
+#include "FortuneCoinShape.h"
+#include "ProceduralMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Engine/StaticMesh.h"
@@ -52,6 +54,11 @@ AFortuneCoinPreview::AFortuneCoinPreview()
 	TailsFace = Make(TEXT("TailsFace"), Cyl.Object, FVector(0.f, 0.f, -0.32f), FVector(0.046f, 0.046f, 0.0008f));
 	TailsRing = Make(TEXT("TailsRing"), Cyl.Object, FVector(0.f, 0.f, -0.34f), FVector(0.022f, 0.022f, 0.0008f));
 
+	ShapedCoin = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("ShapedCoin"));
+	ShapedCoin->SetupAttachment(Spinner);
+	ShapedCoin->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ShapedCoin->SetVisibility(false);
+
 	KeyLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("KeyLight"));
 	KeyLight->SetupAttachment(Root);
 	KeyLight->SetRelativeLocation(FVector(-12.f, -8.f, 10.f));
@@ -96,6 +103,20 @@ void AFortuneCoinPreview::PlaceAt(const FVector& Location, const FVector& ViewFr
 void AFortuneCoinPreview::SetCoin(const UFortuneCoinData* Coin, bool bOwned, bool bEnchanted)
 {
 	PopIn = 0.f;
+
+	// Yuz resimleri olan coin: sekilli model (bulunmamissa siyah siluet)
+	const bool bShaped = Coin && !Coin->CoinMesh && FFortuneCoinShapeBuilder::BuildForCoin(ShapedCoin, Coin, bOwned, bEnchanted);
+	ShapedCoin->SetVisibility(bShaped);
+	if (bShaped)
+	{
+		CoinMesh->SetVisibility(false);
+		HeadsFace->SetVisibility(false);
+		HeadsGem->SetVisibility(false);
+		TailsFace->SetVisibility(false);
+		TailsRing->SetVisibility(false);
+		return;
+	}
+	CoinMesh->SetVisibility(true);
 	const bool bCustomMesh = Coin && Coin->CoinMesh;
 	CoinMesh->SetStaticMesh(bCustomMesh ? Coin->CoinMesh.Get() : DefaultCoinMesh.Get());
 

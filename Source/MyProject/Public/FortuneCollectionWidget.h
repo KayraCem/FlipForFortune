@@ -55,6 +55,9 @@ class MYPROJECT_API UFortuneCollectionWidget : public UUserWidget
 public:
 	void SelectIndex(int32 NewIndex);
 
+	/** Acilinca bu coin secili gelsin (gacha'dan sonra). AddToViewport'tan once ayarla. */
+	FName FocusCoinId;
+
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 	virtual void NativeConstruct() override;

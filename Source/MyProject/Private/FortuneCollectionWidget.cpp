@@ -5,6 +5,7 @@
 #include "FortuneCoinPreview.h"
 #include "FortuneHUDWidget.h"
 #include "FortunePlayerController.h"
+#include "FortuneMenuWidgets.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
@@ -411,6 +412,13 @@ void UFortuneCollectionWidget::NativeConstruct()
 		{
 			if (Entries[i].bEquipped) Selected = i;
 		}
+		if (!FocusCoinId.IsNone())
+		{
+			for (int32 i = 0; i < Entries.Num(); ++i)
+			{
+				if (Entries[i].Coin && Entries[i].Coin->GetCoinId() == FocusCoinId) Selected = i;
+			}
+		}
 	}
 	BuildSlots();
 
@@ -633,6 +641,26 @@ void UFortuneCollectionWidget::RefreshDetails()
 			Body += FString::Printf(TEXT("Enchant:  %s"), *E.EnchantText.ToString());
 		}
 	}
+	else if (Page == 3)
+	{
+		Title = TEXT("ENCHANT");
+		if (!E.bOwned)
+		{
+			Body = TEXT("Bu coini bulunca enchant'ı burada görünecek.");
+		}
+		else if (!E.bEnchanted)
+		{
+			Body = TEXT("Bu coinde enchant yok.\n\nAşağıdaki ENCHANT butonuyla bir Enchant Scroll kullanarak coine rastgele bir güç verebilirsin.");
+		}
+		else
+		{
+			const FString TierStr = E.Enchant.Tier >= 3 ? TEXT("TIER 3  •  LEGENDARY") : (E.Enchant.Tier == 2 ? TEXT("TIER 2  •  EPIC") : TEXT("TIER 1  •  RARE"));
+			FString Stat = E.EnchantText.ToString();
+			int32 Dash = INDEX_NONE;
+			if (Stat.FindChar(TEXT('-'), Dash)) Stat = Stat.Mid(Dash + 1).TrimStartAndEnd();
+			Body = FString::Printf(TEXT("%s\n%s\n\nNe yapar:  %s"), *TierStr, *Stat, *UFortuneSubsystem::GetEnchantDescription(E.Enchant.Stat));
+		}
+	}
 	else
 	{
 		Title = TEXT("SEVİYE");
@@ -681,7 +709,7 @@ void UFortuneCollectionWidget::RefreshDetails()
 
 	const int32 Scrolls = F->GetItemCount(EFortuneItemType::EnchantScroll);
 	EnchantText->SetText(FText::FromString(FString::Printf(TEXT("ENCHANT  x%d"), Scrolls)));
-	EnchantButton->SetIsEnabled(E.bOwned && Scrolls > 0);
+	EnchantButton->SetIsEnabled(E.bOwned);
 }
 
 void UFortuneCollectionWidget::ShowToast(const FText& Msg, const FLinearColor& Color)
@@ -721,14 +749,15 @@ void UFortuneCollectionWidget::OnEnchantClicked()
 	UFortuneSubsystem* F = GetFortune();
 	if (!F || !Entries.IsValidIndex(Selected) || !Entries[Selected].Coin) return;
 
-	FFortuneEnchant Result;
-	if (F->UseEnchantScroll(Entries[Selected].Coin->GetCoinId(), Result))
+	// Ayri Enchant ekranini ac (cark animasyonu, tier nadirlikleri)
+	if (APlayerController* PC = GetOwningPlayer())
 	{
-		const FLinearColor TierColor = Result.Tier >= 3 ? FLinearColor(1.f, 0.78f, 0.2f)
-			: (Result.Tier == 2 ? FLinearColor(0.75f, 0.4f, 1.f) : FLinearColor(0.4f, 0.75f, 1.f));
-		ShowToast(F->FormatEnchant(Result), TierColor);
-		Page = 1;   // istatistik sayfasinda enchant'i goster
-		RefreshDetails();
+		if (UFortuneEnchantWidget* W = CreateWidget<UFortuneEnchantWidget>(PC, UFortuneEnchantWidget::StaticClass()))
+		{
+			W->CoinId = Entries[Selected].Coin->GetCoinId();
+			W->AddToViewport(15);
+			Page = 3;
+		}
 	}
 }
 
@@ -739,12 +768,12 @@ void UFortuneCollectionWidget::OnBackClicked()
 
 void UFortuneCollectionWidget::OnPrevPage()
 {
-	Page = (Page + 2) % 3;
+	Page = (Page + 3) % 4;
 	RefreshDetails();
 }
 
 void UFortuneCollectionWidget::OnNextPage()
 {
-	Page = (Page + 1) % 3;
+	Page = (Page + 1) % 4;
 	RefreshDetails();
 }

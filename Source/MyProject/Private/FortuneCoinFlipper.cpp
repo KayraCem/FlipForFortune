@@ -3,6 +3,8 @@
 #include "FortuneCoinData.h"
 #include "FortuneSettings.h"
 #include "FortuneLandFX.h"
+#include "FortuneCoinShape.h"
+#include "ProceduralMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Animation/AnimInstance.h"
@@ -61,6 +63,11 @@ AFortuneCoinFlipper::AFortuneCoinFlipper()
 	HeadsGem  = MakeFace(TEXT("HeadsGem"),  Sph.Object, FVector(0.f, 0.f, 0.36f), FVector(0.016f, 0.016f, 0.004f));
 	TailsFace = MakeFace(TEXT("TailsFace"), Cyl.Object, FVector(0.f, 0.f, -0.32f), FVector(0.046f, 0.046f, 0.0008f));
 	TailsRing = MakeFace(TEXT("TailsRing"), Cyl.Object, FVector(0.f, 0.f, -0.34f), FVector(0.022f, 0.022f, 0.0008f));
+
+	ShapedCoin = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("ShapedCoin"));
+	ShapedCoin->SetupAttachment(CoinPivot);
+	ShapedCoin->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ShapedCoin->SetVisibility(false);
 
 	EnchantFX = CreateDefaultSubobject<UNiagaraComponent>(TEXT("EnchantFX"));
 	EnchantFX->SetupAttachment(CoinPivot);
@@ -135,8 +142,11 @@ void AFortuneCoinFlipper::RefreshCoinVisuals()
 	{
 		CoinMesh->SetStaticMesh(Coin->CoinMesh);
 	}
-	// Kendi mesh'i olan coinlerde gecici yuz amblemlerini gizle
-	const bool bShowFaces = (Coin->CoinMesh == nullptr);
+	// Yuz resmi olan coin: sekilli model; yoksa eski silindir + gecici amblemler
+	const bool bShaped = !Coin->CoinMesh && FFortuneCoinShapeBuilder::BuildForCoin(ShapedCoin, Coin, true, Owned.Enchant.IsActive());
+	ShapedCoin->SetVisibility(bShaped);
+	CoinMesh->SetVisibility(!bShaped);
+	const bool bShowFaces = (Coin->CoinMesh == nullptr) && !bShaped;
 	HeadsFace->SetVisibility(bShowFaces);
 	HeadsGem->SetVisibility(bShowFaces);
 	TailsFace->SetVisibility(bShowFaces);
@@ -279,7 +289,7 @@ void AFortuneCoinFlipper::Land()
 	{
 		const EFortuneLandFX FXType = Coin ? Coin->LandFX : EFortuneLandFX::Dust;
 		const float Power = Current.bJackpot ? 2.2f : (Current.bCritical ? 1.6f : 1.f);
-		AFortuneLandFX::SpawnAt(GetWorld(), LandLoc, FXType, Power, Current.bHeads);
+		AFortuneLandFXActor::SpawnAt(GetWorld(), LandLoc, FXType, Power, Current.bHeads);
 	}
 
 	if (Current.bCritical)

@@ -44,6 +44,24 @@ def enum_value(enum_cls, name):
             return getattr(enum_cls, attr)
     return None
 
+
+def import_texture(rel_file, dest_dir, name):
+    """Proje klasorundeki PNG'yi Unreal dokusu olarak ice aktar."""
+    try:
+        f = unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()) + rel_file
+        task = unreal.AssetImportTask()
+        task.set_editor_property("filename", f)
+        task.set_editor_property("destination_path", dest_dir)
+        task.set_editor_property("destination_name", name)
+        task.set_editor_property("replace_existing", True)
+        task.set_editor_property("automated", True)
+        task.set_editor_property("save", True)
+        asset_tools.import_asset_tasks([task])
+        return unreal.load_asset(f"{dest_dir}/{name}")
+    except Exception as e:
+        unreal.log_warning(f"Doku ice aktarilamadi {rel_file}: {e}")
+        return None
+
 # ---------------------------------------------------------------- materyaller
 def make_material(name, rgb, metallic=0.0, roughness=0.5, emissive=None, opacity=None):
     path = f"{MAT_DIR}/{name}"
@@ -132,8 +150,60 @@ M = {
     "marble": make_material("M_Marble", (0.75, 0.72, 0.68), 0.0, 0.25),
     "show_floor": make_material("M_ShowFloor", (0.03, 0.025, 0.03), 0.3, 0.2),
     "glow_gold": make_material("M_GlowGold", (1.0, 0.7, 0.25), 1.0, 0.3, emissive=(2.0, 1.2, 0.3)),
+    "piggy": make_material("M_PiggyPink", (0.95, 0.45, 0.58), 0.0, 0.25),
+    "piggy_dark": make_material("M_PiggyPinkDark", (0.8, 0.32, 0.45), 0.0, 0.35),
+    "spell_cover": make_material("M_SpellCover", (0.2, 0.04, 0.3), 0.0, 0.5),
+    "rune": make_material("M_Rune", (0.6, 0.3, 1.0), 0.0, 0.4, emissive=(4.0, 1.6, 8.0)),
 }
 
+
+
+def make_coin_face_material():
+    """Coin yuzleri: Face (doku) x Tint -> renk, Glow -> parlama. Metalik."""
+    path = f"{MAT_DIR}/M_CoinFace"
+    if eal.does_asset_exist(path):
+        return unreal.load_asset(path)
+    mat = asset_tools.create_asset("M_CoinFace", MAT_DIR, unreal.Material, unreal.MaterialFactoryNew())
+    tex = mel.create_material_expression(mat, unreal.MaterialExpressionTextureSampleParameter2D, -700, 0)
+    tex.set_editor_property("parameter_name", "Face")
+    tex.set_editor_property("texture", unreal.load_asset("/Engine/EngineResources/WhiteSquareTexture"))
+    tint = mel.create_material_expression(mat, unreal.MaterialExpressionVectorParameter, -700, 250)
+    tint.set_editor_property("parameter_name", "Tint")
+    tint.set_editor_property("default_value", unreal.LinearColor(1, 1, 1, 1))
+    glow = mel.create_material_expression(mat, unreal.MaterialExpressionScalarParameter, -700, 400)
+    glow.set_editor_property("parameter_name", "Glow")
+    glow.set_editor_property("default_value", 0.0)
+    mul = mel.create_material_expression(mat, unreal.MaterialExpressionMultiply, -400, 100)
+    mel.connect_material_expressions(tex, "RGB", mul, "A")
+    mel.connect_material_expressions(tint, "", mul, "B")
+    mel.connect_material_property(mul, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    emi = mel.create_material_expression(mat, unreal.MaterialExpressionMultiply, -200, 300)
+    mel.connect_material_expressions(mul, "", emi, "A")
+    mel.connect_material_expressions(glow, "", emi, "B")
+    mel.connect_material_property(emi, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    met = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -400, 450)
+    met.set_editor_property("r", 0.85)
+    mel.connect_material_property(met, "", unreal.MaterialProperty.MP_METALLIC)
+    rough = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -400, 550)
+    rough.set_editor_property("r", 0.32)
+    mel.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    mel.recompile_material(mat)
+    eal.save_loaded_asset(mat)
+    return mat
+
+
+make_coin_face_material()
+
+# Menu coin yagmuru ve efektler instanced mesh kullanir: materyallere izin ver (yoksa beyaz gorunur)
+for _path in eal.list_assets(MAT_DIR, recursive=False):
+    try:
+        _m = unreal.load_asset(_path)
+        if isinstance(_m, unreal.Material) and not _m.get_editor_property("used_with_instanced_static_meshes"):
+            _m.set_editor_property("used_with_instanced_static_meshes", True)
+            mel.recompile_material(_m)
+            eal.save_loaded_asset(_m)
+    except Exception as _e:
+        unreal.log_warning(f"Materyal ayari: {_path}: {_e}")
 
 # ---------------------------------------------------------------- yardimcilar
 def part(label, mesh, loc, size, mat, rot=None, parent=None, folder="Props"):
@@ -178,7 +248,7 @@ def interactable(label, action, text, loc, extent):
 level_sub.load_level(MAP_PATH)
 for a in actors.get_all_level_actors():
     folder = str(a.get_folder_path())
-    if a.get_actor_label() == "Coin" or folder.split("/")[0] in ("Props", "Decor", "Interactables", "Gameplay", "Showcase"):
+    if a.get_actor_label() == "Coin" or folder.split("/")[0] in ("Props", "Decor", "Interactables", "Gameplay", "Showcase", "MenuStage"):
         actors.destroy_actor(a)
 
 # ---------------------------------------------------------------- 1) Coin data asset'leri
@@ -218,6 +288,22 @@ for cid, name, rarity, weight, base, per, ptype, pval, ptext, mat, desc in COINS
     icon = {"bronze": (0.62, 0.36, 0.18), "silver": (0.85, 0.86, 0.9), "gold": (1.0, 0.72, 0.25),
             "clover": (0.2, 0.75, 0.35), "phoenix": (1.0, 0.35, 0.08)}.get(mat, (0.9, 0.7, 0.3))
     da.set_editor_property("icon_color", unreal.LinearColor(icon[0], icon[1], icon[2], 1.0))
+    # Sekil + yazi/tura yuz resimleri (Art/Coins/*.png)
+    try:
+        coin_key = cid.replace("DA_Coin_", "")
+        shape = {"Bronze": "ROUND", "Silver": "OCTAGON", "Gold": "SCALLOPED", "Clover": "DECAGON", "Phoenix": "GEAR"}.get(coin_key, "ROUND")
+        sv = enum_value(unreal.FortuneCoinShape, shape)
+        if sv is not None:
+            da.set_editor_property("shape", sv)
+        for side, prop in (("Heads", "heads_texture"), ("Tails", "tails_texture")):
+            t = import_texture(f"Art/Coins/T_Coin_{coin_key}_{side}.png", COIN_DIR + "/Textures", f"T_Coin_{coin_key}_{side}")
+            if t:
+                da.set_editor_property(prop, t)
+        rim = {"Bronze": (0.55, 0.3, 0.12), "Silver": (0.7, 0.72, 0.78), "Gold": (0.95, 0.65, 0.15),
+               "Clover": (0.75, 0.65, 0.3), "Phoenix": (0.8, 0.3, 0.08)}.get(coin_key, (0.75, 0.5, 0.15))
+        da.set_editor_property("rim_color", unreal.LinearColor(rim[0], rim[1], rim[2], 1.0))
+    except Exception as e:
+        unreal.log_warning(f"Coin gorunumu ayarlanamadi ({cid}): {e}")
     land = {"bronze": "DUST", "silver": "SPARKS", "gold": "GOLD_RING", "clover": "LEAVES", "phoenix": "FLAME"}.get(mat, "DUST")
     try:
         val = enum_value(unreal.FortuneLandFX, land)
@@ -246,29 +332,26 @@ for i, dy in enumerate((-7.0, 7.0)):
     part(f"Chest_LidBand_{i}", CYL, (cx, cy + dy, TABLE_Z + 10), (14.6, 14.6, 1.2), M["gold"], rot=R(roll=90), parent=chest)
 part("Chest_Lock", CUBE, (cx - 7.4, cy, TABLE_Z + 9), (1.2, 3, 3.5), M["gold"], parent=chest)
 
-# ---------------------------------------------------------------- 4) Kitap = COIN COLLECTION (sag)
-bx, by = 22.0, 26.0
-book = interactable("Click_Collection", unreal.FortuneInteraction.COIN_COLLECTION, "Coin Collection", (bx, by, TABLE_Z + 4.5), (10, 8.5, 5))
-part("Book_Bottom", CUBE, (bx + 1, by + 0.5, TABLE_Z + 1.5), (17, 13, 3), M["leather_green"], rot=R(yaw=-8), parent=book)
-part("Book_BottomPages", CUBE, (bx + 0.5, by + 0.2, TABLE_Z + 1.5), (16.4, 12.2, 2.4), M["paper"], rot=R(yaw=-8), parent=book)
-part("Album_Cover", CUBE, (bx, by, TABLE_Z + 4.75), (16, 12, 3.5), M["leather_red"], rot=R(yaw=6), parent=book)
-part("Album_Pages", CUBE, (bx - 0.4, by - 0.3, TABLE_Z + 4.75), (15.4, 11.6, 2.8), M["paper"], rot=R(yaw=6), parent=book)
-part("Album_Emblem", CYL, (bx, by, TABLE_Z + 6.6), (6, 6, 0.4), M["gold"], parent=book)
+# ---------------------------------------------------------------- 4) KUMBARA = COIN COLLECTION (sag)
+bx, by = 22.0, 27.0
+book = interactable("Click_Collection", unreal.FortuneInteraction.COIN_COLLECTION, "Coin Collection", (bx, by, TABLE_Z + 7), (11, 9, 7.5))
+part("Piggy_Body", SPH, (bx, by, TABLE_Z + 7), (17, 13, 12), M["piggy"], parent=book)
+part("Piggy_Snout", CYL, (bx - 8.6, by, TABLE_Z + 7.5), (5, 5, 2.2), M["piggy_dark"], rot=R(pitch=90), parent=book)
+for i, dy in enumerate((-0.9, 0.9)):
+    part(f"Piggy_Nostril_{i}", CYL, (bx - 9.8, by + dy, TABLE_Z + 7.5), (0.9, 0.9, 0.3), M["dark"], rot=R(pitch=90), parent=book)
+    part(f"Piggy_Eye_{i}", SPH, (bx - 6.2, by + dy * 2.8, TABLE_Z + 10.3), (1.2, 1.2, 1.2), M["dark"], parent=book)
+    part(f"Piggy_Ear_{i}", CONE, (bx - 3.5, by + dy * 4.2, TABLE_Z + 13.2), (3.2, 2.4, 3.2), M["piggy_dark"], rot=R(roll=dy * -20), parent=book)
+for i, (lx, ly) in enumerate(((-4.5, -3.5), (-4.5, 3.5), (4.5, -3.5), (4.5, 3.5))):
+    part(f"Piggy_Leg_{i}", CYL, (bx + lx, by + ly, TABLE_Z + 1.2), (3, 3, 2.4), M["piggy_dark"], parent=book)
+part("Piggy_Tail", SPH, (bx + 8.6, by, TABLE_Z + 8.5), (1.6, 1.6, 1.6), M["piggy_dark"], parent=book)
+part("Piggy_Slot", CUBE, (bx + 1, by, TABLE_Z + 12.9), (5, 0.8, 0.6), M["dark"], parent=book)
+part("Piggy_SlotCoin", CYL, (bx + 1, by, TABLE_Z + 14.3), (4, 4, 0.5), M["gold"], rot=R(roll=90), parent=book)
 
-# ---------------------------------------------------------------- 5) Gacha makinesi = SUMMON (arka orta)
-gx, gy = 50.0, 0.0
-gacha = interactable("Click_Gacha", unreal.FortuneInteraction.SUMMON, "Gacha", (gx, gy, TABLE_Z + 20), (12, 12, 20))
-part("Gacha_Base", CUBE, (gx, gy, TABLE_Z + 8), (20, 20, 16), M["red_paint"], parent=gacha)
-part("Gacha_Ring", CYL, (gx, gy, TABLE_Z + 17), (21, 21, 2), M["gold"], parent=gacha)
-part("Gacha_Globe", SPH, (gx, gy, TABLE_Z + 27), (22, 22, 22), M["glass"], parent=gacha)
-caps = [("cap_blue", (-4, -3, 22)), ("cap_pink", (3, 4, 21)), ("cap_yellow", (4, -4, 23)), ("cap_blue", (-3, 4, 25)),
-        ("cap_pink", (0, -1, 27)), ("cap_yellow", (-4, 0, 28)), ("gold", (3, 0, 25))]
-for i, (m, (ox, oy, oz)) in enumerate(caps):
-    part(f"Gacha_Capsule_{i}", SPH, (gx + ox, gy + oy, TABLE_Z + oz), (5, 5, 5), M[m], parent=gacha)
-part("Gacha_Top", CYL, (gx, gy, TABLE_Z + 38.5), (8, 8, 3), M["red_paint"], parent=gacha)
-part("Gacha_Knob", CYL, (gx - 11, gy, TABLE_Z + 10), (6, 6, 2), M["silver"], rot=R(pitch=90), parent=gacha)
-part("Gacha_KnobBar", CUBE, (gx - 12.2, gy, TABLE_Z + 10), (1, 1.2, 6), M["silver"], parent=gacha)
-part("Gacha_Chute", CUBE, (gx - 10.2, gy, TABLE_Z + 3.5), (0.8, 8, 5), M["dark"], parent=gacha)
+# ---------------------------------------------------------------- 5) Gacha HAZINE SANDIGI (arka orta)
+# Model ve acilis animasyonu C++ (FortuneGachaChest) icinde; burada sadece yerlestiriliyor.
+gacha = actors.spawn_actor_from_class(unreal.FortuneGachaChest, V(50, 0, TABLE_Z + 14), R())
+gacha.set_actor_label("GachaChest")
+gacha.set_folder_path("Interactables")
 
 # ---------------------------------------------------------------- 6) Ors = YUKSELTMELER (on sol)
 ax, ay = -22.0, -32.0
@@ -279,6 +362,21 @@ part("Anvil_Top", CUBE, (ax, ay, TABLE_Z + 9), (13, 6, 4), M["iron"], parent=anv
 part("Anvil_Horn", CONE, (ax + 9, ay, TABLE_Z + 9.5), (4, 4, 6), M["iron"], rot=R(pitch=-90), parent=anvil)
 part("Hammer_Handle", CYL, (ax - 2, ay + 8, TABLE_Z + 1), (1.4, 1.4, 14), M["chest"], rot=R(pitch=90, yaw=20), parent=anvil)
 part("Hammer_Head", CUBE, (ax - 8.5, ay + 5.6, TABLE_Z + 1.6), (3, 5, 3), M["iron"], rot=R(yaw=20), parent=anvil)
+
+
+# ---------------------------------------------------------------- 6b) BUYU KITABI = ENCHANT (orta)
+s_x, s_y = 14.0, 0.0
+spell = interactable("Click_Enchant", enum_value(unreal.FortuneInteraction, "ENCHANT"), "Enchant", (s_x, s_y, TABLE_Z + 5), (11, 13, 6))
+part("Spell_Stand", CUBE, (s_x, s_y, TABLE_Z + 1), (12, 16, 2), M["chest"], parent=spell)
+part("Spell_CoverL", CUBE, (s_x, s_y - 6.5, TABLE_Z + 3.2), (13, 12, 0.8), M["spell_cover"], rot=R(roll=-10), parent=spell)
+part("Spell_CoverR", CUBE, (s_x, s_y + 6.5, TABLE_Z + 3.2), (13, 12, 0.8), M["spell_cover"], rot=R(roll=10), parent=spell)
+part("Spell_PagesL", CUBE, (s_x, s_y - 6.2, TABLE_Z + 4.0), (12, 11, 1.2), M["paper"], rot=R(roll=-10), parent=spell)
+part("Spell_PagesR", CUBE, (s_x, s_y + 6.2, TABLE_Z + 4.0), (12, 11, 1.2), M["paper"], rot=R(roll=10), parent=spell)
+part("Spell_Spine", CYL, (s_x, s_y, TABLE_Z + 3.0), (2.2, 2.2, 13), M["gold"], rot=R(pitch=90), parent=spell)
+part("Spell_RuneL", CYL, (s_x, s_y - 6.0, TABLE_Z + 4.75), (6, 6, 0.2), M["rune"], rot=R(roll=-10), parent=spell)
+part("Spell_RuneR", CUBE, (s_x, s_y + 6.0, TABLE_Z + 4.75), (7, 5, 0.2), M["rune"], rot=R(roll=10, yaw=45), parent=spell)
+part("Spell_Orb", SPH, (s_x, s_y, TABLE_Z + 12), (2.5, 2.5, 2.5), M["rune"], parent=spell)
+point_light("Light_Spell", (s_x, s_y, TABLE_Z + 12), 400.0, 90.0, (0.7, 0.35, 1.0), shadows=False)
 
 # ---------------------------------------------------------------- 7) Dekor: para kuleleri, mum, masa lambasi
 for s, (sx, sy, n) in enumerate([(-24, 30, 6), (-18, 35, 4), (-28, 36, 3)]):
@@ -360,7 +458,7 @@ except Exception as e:
 target = V(12, 0, TABLE_Z + 4)
 cam = None
 for a in actors.get_all_level_actors():
-    if isinstance(a, unreal.CameraActor) and a.get_actor_label() != "CollectionCamera":
+    if isinstance(a, unreal.CameraActor) and a.get_actor_label() not in ("CollectionCamera", "MenuCamera"):
         cam = a
         break
 if cam is None:
@@ -446,6 +544,69 @@ show_cam.set_actor_rotation(R(pitch=math.degrees(math.atan2(sd.z, math.hypot(sd.
 show_cam.camera_component.set_editor_property("field_of_view", 60.0)
 show_cam.set_editor_property("tags", [unreal.Name("CollectionCamera")])
 show_cam.set_editor_property("auto_activate_for_player", unreal.AutoReceiveInput.DISABLED)
+
+
+# ---------------------------------------------------------------- 10c) ANA MENU SAHNESI + LOGO
+# Logo dokusunu ice aktar (Art/Logo/FFF_Logo.png -> /Game/FlipForFortune/UI/T_FFF_Logo)
+try:
+    logo_file = unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()) + "Art/Logo/FFF_Logo.png"
+    task = unreal.AssetImportTask()
+    task.set_editor_property("filename", logo_file)
+    task.set_editor_property("destination_path", ROOT + "/UI")
+    task.set_editor_property("destination_name", "T_FFF_Logo")
+    task.set_editor_property("replace_existing", True)
+    task.set_editor_property("automated", True)
+    task.set_editor_property("save", True)
+    asset_tools.import_asset_tasks([task])
+    tex = unreal.load_asset(ROOT + "/UI/T_FFF_Logo")
+    if tex:
+        tex.set_editor_property("lod_group", unreal.TextureGroup.TEXTUREGROUP_UI)
+        tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_EDITOR_ICON)
+        tex.set_editor_property("never_stream", True)
+        eal.save_loaded_asset(tex)
+except Exception as e:
+    unreal.log_warning("Logo ice aktarilamadi: " + str(e))
+
+MX, MY = 0.0, -3000.0
+MF = "MenuStage"
+def mp(label, mesh, loc, size, mat, rot=None):
+    return part(label, mesh, (MX + loc[0], MY + loc[1], loc[2]), size, mat, rot=rot, folder=MF)
+
+# Koyu kadife fon + altin cerceveli kemerler
+mp("Menu_Back", CUBE, (200, 0, 150), (10, 900, 500), M["velvet_dark"])
+mp("Menu_Floor", CUBE, (0, 0, -5), (600, 900, 10), M["show_floor"])
+for i in range(9):
+    mp(f"Menu_Curtain_{i}", CYL, (185, -320 + i * 80, 150), (60, 60, 500), M["velvet"])
+mp("Menu_Glow", CUBE, (175, -120, 150), (2, 260, 300), M["glow_gold"])
+for side in (-1, 1):
+    mp(f"Menu_Pillar_{side}", CYL, (150, side * 330, 150), (40, 40, 400), M["marble"])
+# Isiklar: soldaki coin yagmuruna sicak spot, arkadan renkli kenar isiklari
+def menu_spot(label, loc, rot, intensity, color, cone):
+    l = actors.spawn_actor_from_class(unreal.SpotLight, V(MX + loc[0], MY + loc[1], loc[2]), rot)
+    l.set_actor_label(label)
+    l.set_folder_path(MF)
+    c = l.spot_light_component
+    c.set_intensity(intensity)
+    c.set_light_color(unreal.LinearColor(color[0], color[1], color[2], 1.0))
+    c.set_outer_cone_angle(cone)
+    c.set_inner_cone_angle(cone * 0.6)
+menu_spot("Menu_KeySpot", (-220, -150, 300), R(pitch=-35, yaw=10), 40000.0, (1.0, 0.85, 0.6), 30.0)
+menu_spot("Menu_RimL", (120, -260, 260), R(pitch=-30, yaw=200), 20000.0, (0.7, 0.35, 1.0), 35.0)
+menu_spot("Menu_RimR", (120, 120, 260), R(pitch=-30, yaw=160), 15000.0, (1.0, 0.45, 0.15), 35.0)
+point_light("Menu_Fill", (MX - 150, MY, 150), 1500.0, 900.0, (1.0, 0.85, 0.7)).set_folder_path(MF)
+
+# Yagan coinler (kameranin solunda)
+rain = actors.spawn_actor_from_class(unreal.FortuneCoinRain, V(MX - 90, MY - 75, 150), R())
+rain.set_actor_label("MenuCoinRain")
+rain.set_folder_path(MF)
+
+# Menu kamerasi
+menu_cam = actors.spawn_actor_from_class(unreal.CameraActor, V(MX - 300, MY, 150), R())
+menu_cam.set_actor_label("MenuCamera")
+menu_cam.set_folder_path(MF)
+menu_cam.camera_component.set_editor_property("field_of_view", 60.0)
+menu_cam.set_editor_property("tags", [unreal.Name("MenuCamera")])
+menu_cam.set_editor_property("auto_activate_for_player", unreal.AutoReceiveInput.DISABLED)
 
 # ---------------------------------------------------------------- 11) Kaydet
 level_sub.save_current_level()

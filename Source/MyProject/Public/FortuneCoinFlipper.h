@@ -11,6 +11,7 @@ class USkeletalMeshComponent;
 class UNiagaraComponent;
 class UFortuneSubsystem;
 class UMaterialInterface;
+class UProceduralMeshComponent;
 
 UCLASS(Blueprintable)
 class MYPROJECT_API AFortuneCoinFlipper : public AActor
@@ -46,6 +47,10 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UNiagaraComponent> EnchantFX;
+
+	/** Yuz resimleri olan coinler icin sekilli coin modeli. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UProceduralMeshComponent> ShapedCoin;
 
 	/** Yazi yuzu (ust): parlak amblem. Coin kendi mesh'ini kullanirsa gizlenir. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")

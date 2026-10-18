@@ -7,7 +7,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
 
-AFortuneLandFX::AFortuneLandFX()
+AFortuneLandFXActor::AFortuneLandFXActor()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	SetActorEnableCollision(false);
@@ -29,18 +29,18 @@ AFortuneLandFX::AFortuneLandFX()
 	LitMaterial = Shape.Object;
 }
 
-void AFortuneLandFX::SpawnAt(UWorld* World, const FVector& Location, EFortuneLandFX Type, float Power, bool bHeads)
+void AFortuneLandFXActor::SpawnAt(UWorld* World, const FVector& Location, EFortuneLandFX Type, float Power, bool bHeads)
 {
 	if (!World || Type == EFortuneLandFX::None) return;
 	FActorSpawnParameters P;
 	P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	if (AFortuneLandFX* FX = World->SpawnActor<AFortuneLandFX>(AFortuneLandFX::StaticClass(), FTransform(Location), P))
+	if (AFortuneLandFXActor* FX = World->SpawnActor<AFortuneLandFXActor>(AFortuneLandFXActor::StaticClass(), FTransform(Location), P))
 	{
 		FX->Play(Type, Power, bHeads);
 	}
 }
 
-int32 AFortuneLandFX::AddGroup(UStaticMesh* Mesh, const FLinearColor& Color, bool bGlow, float Glow)
+int32 AFortuneLandFXActor::AddGroup(UStaticMesh* Mesh, const FLinearColor& Color, bool bGlow, float Glow)
 {
 	UInstancedStaticMeshComponent* ISM = NewObject<UInstancedStaticMeshComponent>(this);
 	ISM->SetMobility(EComponentMobility::Movable);
@@ -59,14 +59,14 @@ int32 AFortuneLandFX::AddGroup(UStaticMesh* Mesh, const FLinearColor& Color, boo
 	return Groups.Add(ISM);
 }
 
-FVector AFortuneLandFX::RandRing(float MinSpeed, float MaxSpeed, float Up) const
+FVector AFortuneLandFXActor::RandRing(float MinSpeed, float MaxSpeed, float Up) const
 {
 	const float A = FMath::FRandRange(0.f, 2.f * PI);
 	const float S = FMath::FRandRange(MinSpeed, MaxSpeed);
 	return FVector(FMath::Cos(A) * S, FMath::Sin(A) * S, Up);
 }
 
-void AFortuneLandFX::Emit(int32 Group, const FVector& Vel, const FVector& Size, float Life, float Gravity, float Drag,
+void AFortuneLandFXActor::Emit(int32 Group, const FVector& Vel, const FVector& Size, float Life, float Gravity, float Drag,
 	const FVector& Offset, bool bGrowFirst, bool bSpin, bool bFlicker)
 {
 	if (!Groups.IsValidIndex(Group)) return;
@@ -89,7 +89,7 @@ void AFortuneLandFX::Emit(int32 Group, const FVector& Vel, const FVector& Size, 
 	Particles.Add(P);
 }
 
-void AFortuneLandFX::Flash(const FLinearColor& Color, float Intensity, float Radius)
+void AFortuneLandFXActor::Flash(const FLinearColor& Color, float Intensity, float Radius)
 {
 	Light->SetLightColor(Color);
 	Light->SetAttenuationRadius(Radius);
@@ -98,7 +98,7 @@ void AFortuneLandFX::Flash(const FLinearColor& Color, float Intensity, float Rad
 	Light->SetIntensity(Intensity);
 }
 
-void AFortuneLandFX::Play(EFortuneLandFX Type, float Power, bool bHeads)
+void AFortuneLandFXActor::Play(EFortuneLandFX Type, float Power, bool bHeads)
 {
 	// Isik saçan parcaciklar icin projedeki M_FX_Glow (Python betigi olusturur), yoksa normal materyal
 	GlowMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/FlipForFortune/Materials/M_FX_Glow.M_FX_Glow"), nullptr, LOAD_NoWarn | LOAD_Quiet);
@@ -211,7 +211,7 @@ void AFortuneLandFX::Play(EFortuneLandFX Type, float Power, bool bHeads)
 	}
 }
 
-void AFortuneLandFX::Tick(float DeltaSeconds)
+void AFortuneLandFXActor::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	TotalAge += DeltaSeconds;

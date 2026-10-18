@@ -4,6 +4,7 @@
 #include "FortuneCoinFlipper.h"
 #include "FortuneCollectionWidget.h"
 #include "FortuneUpgradeWidget.h"
+#include "FortuneMenuWidgets.h"
 #include "FortunePlayerController.h"
 #include "Components/BoxComponent.h"
 #include "Components/PointLightComponent.h"
@@ -88,7 +89,24 @@ void AFortuneInteractable::Interact()
 		UGameplayStatics::PlaySound2D(this, ClickSound);
 	}
 
-	if (Action == EFortuneInteraction::FlipCoin)
+	if (Action == EFortuneInteraction::Enchant && !WidgetClass)
+	{
+		// Buyu kitabi: kusanili coin secili Enchant ekrani
+		APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+		const AFortunePlayerController* FPC = Cast<AFortunePlayerController>(PC);
+		const UGameInstance* GI = GetGameInstance();
+		const UFortuneSubsystem* F = GI ? GI->GetSubsystem<UFortuneSubsystem>() : nullptr;
+		if (PC && F && !(FPC && FPC->IsMenuOpen()))
+		{
+			if (UFortuneEnchantWidget* W = CreateWidget<UFortuneEnchantWidget>(PC, UFortuneEnchantWidget::StaticClass()))
+			{
+				W->CoinId = F->GetEquippedCoinId();
+				W->bStandalone = true;
+				W->AddToViewport(15);
+			}
+		}
+	}
+	else if (Action == EFortuneInteraction::FlipCoin)
 	{
 		for (TActorIterator<AFortuneCoinFlipper> It(GetWorld()); It; ++It)
 		{

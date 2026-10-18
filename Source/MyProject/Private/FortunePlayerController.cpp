@@ -1,6 +1,7 @@
 #include "FortunePlayerController.h"
 #include "FortuneCoinFlipper.h"
 #include "FortuneHUDWidget.h"
+#include "FortuneMenuWidgets.h"
 #include "FortuneSubsystem.h"
 #include "Engine/GameInstance.h"
 #include "Engine/Engine.h"
@@ -46,6 +47,13 @@ void AFortunePlayerController::BeginPlay()
 		if (HUDWidget)
 		{
 			HUDWidget->AddToViewport(0);
+		}
+		if (bShowMainMenu)
+		{
+			if (UUserWidget* Menu = CreateWidget<UUserWidget>(this, UFortuneMainMenuWidget::StaticClass()))
+			{
+				Menu->AddToViewport(50);
+			}
 		}
 	}
 }

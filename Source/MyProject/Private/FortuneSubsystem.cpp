@@ -650,6 +650,53 @@ double UFortuneSubsystem::GetSummonCost() const
 	return FMath::FloorToDouble(S->SummonCost * (1.0 - Discount) + 0.5);
 }
 
+FLinearColor UFortuneSubsystem::GetRarityColor(EFortuneRarity R)
+{
+	switch (R)
+	{
+	case EFortuneRarity::Common:    return FLinearColor(0.82f, 0.78f, 0.72f);
+	case EFortuneRarity::Uncommon:  return FLinearColor(0.4f, 0.95f, 0.45f);
+	case EFortuneRarity::Rare:      return FLinearColor(0.35f, 0.65f, 1.f);
+	case EFortuneRarity::Epic:      return FLinearColor(0.75f, 0.4f, 1.f);
+	case EFortuneRarity::Legendary: return FLinearColor(1.f, 0.78f, 0.2f);
+	default:                        return FLinearColor(1.f, 0.3f, 0.35f);
+	}
+}
+
+FString UFortuneSubsystem::GetEnchantDescription(EFortuneEnchantStat Stat)
+{
+	switch (Stat)
+	{
+	case EFortuneEnchantStat::CoinFlipSpeed:    return TEXT("Coin daha hızlı atılır.");
+	case EFortuneEnchantStat::MoneyEarn:        return TEXT("Her atışta kazandığın para artar.");
+	case EFortuneEnchantStat::Luck:             return TEXT("Gacha'da nadir coin çıkma, Enchant Scroll düşme ve yüksek tier enchant şansını artırır.");
+	case EFortuneEnchantStat::HeadChance:       return TEXT("Yazı gelme şansı artar.");
+	case EFortuneEnchantStat::CritChance:       return TEXT("Kritik vurma şansı artar.");
+	case EFortuneEnchantStat::CriticalMultiply: return TEXT("Kritik vuruşlarda kazancın çarpanı artar.");
+	case EFortuneEnchantStat::XPBoost:          return TEXT("Coin daha hızlı XP kazanır ve seviye atlar.");
+	case EFortuneEnchantStat::TailsBoost:       return TEXT("Tura geldiğinde daha fazla para kazanırsın.");
+	case EFortuneEnchantStat::DoubleFlip:       return TEXT("Bazı atışlar 2 kat para verir.");
+	case EFortuneEnchantStat::Jackpot:          return TEXT("Çok düşük ihtimalle bir atış 10 kat para verir!");
+	case EFortuneEnchantStat::Streak:           return TEXT("Art arda gelen her yazıda kazancın biraz daha artar; tura gelince sıfırlanır.");
+	case EFortuneEnchantStat::SummonDiscount:   return TEXT("Gacha (hazine sandığı) daha ucuza açılır.");
+	case EFortuneEnchantStat::UpgradeDiscount:  return TEXT("Yükseltmeler daha ucuza gelir.");
+	default:                                    return TEXT("");
+	}
+}
+
+FString UFortuneSubsystem::GetRarityName(EFortuneRarity R)
+{
+	switch (R)
+	{
+	case EFortuneRarity::Common:    return TEXT("COMMON");
+	case EFortuneRarity::Uncommon:  return TEXT("UNCOMMON");
+	case EFortuneRarity::Rare:      return TEXT("RARE");
+	case EFortuneRarity::Epic:      return TEXT("EPIC");
+	case EFortuneRarity::Legendary: return TEXT("LEGENDARY");
+	default:                        return TEXT("MYTHIC");
+	}
+}
+
 float UFortuneSubsystem::GetSummonChance(const UFortuneCoinData* Coin) const
 {
 	if (!Coin) return 0.f;

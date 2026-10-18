@@ -196,6 +196,16 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Fortune|Gacha")
 	double GetSummonCost() const;
 
+	UFUNCTION(BlueprintPure, Category = "Fortune|Gacha")
+	static FLinearColor GetRarityColor(EFortuneRarity Rarity);
+
+	/** Enchant boost'unun ne yaptigi (UI icin kisa aciklama). */
+	UFUNCTION(BlueprintPure, Category = "Fortune|Enchant")
+	static FString GetEnchantDescription(EFortuneEnchantStat Stat);
+
+	UFUNCTION(BlueprintPure, Category = "Fortune|Gacha")
+	static FString GetRarityName(EFortuneRarity Rarity);
+
 	/** Bu coinin gacha'dan cikma olasiligi (0-1, Luck dahil). */
 	UFUNCTION(BlueprintPure, Category = "Fortune|Gacha")
 	float GetSummonChance(const UFortuneCoinData* Coin) const;

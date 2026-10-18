@@ -10,6 +10,7 @@ class UPointLightComponent;
 class UFortuneCoinData;
 class UMaterialInterface;
 class UStaticMesh;
+class UProceduralMeshComponent;
 
 UCLASS(NotBlueprintable)
 class MYPROJECT_API AFortuneCoinPreview : public AActor
@@ -54,6 +55,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UPointLightComponent> KeyLight;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UProceduralMeshComponent> ShapedCoin;
 
 	UPROPERTY()
 	TObjectPtr<UStaticMesh> DefaultCoinMesh;

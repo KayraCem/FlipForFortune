@@ -73,6 +73,22 @@ public:
 	FText PassiveDescription;
 
 	// ---- Gorunus ----
+	/** Coin'in sekli (yuz dokulari varsa kullanilir). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
+	EFortuneCoinShape Shape = EFortuneCoinShape::Round;
+
+	/** Yazi yuzu resmi. Doluysa coin bu sekil + resimlerle olusturulur. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
+	TObjectPtr<UTexture2D> HeadsTexture = nullptr;
+
+	/** Tura yuzu resmi. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
+	TObjectPtr<UTexture2D> TailsTexture = nullptr;
+
+	/** Kenar (yan yuz) rengi. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
+	FLinearColor RimColor = FLinearColor(0.75f, 0.5f, 0.15f);
+
 	/** Bos birakilirsa sahnedeki varsayilan coin mesh'i kullanilir. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
 	TObjectPtr<UStaticMesh> CoinMesh = nullptr;

@@ -19,7 +19,8 @@ enum class EFortuneInteraction : uint8
 	Upgrades,
 	Summon,
 	FlipCoin,
-	Custom
+	Custom,
+	Enchant
 };
 
 UCLASS(Blueprintable)
@@ -36,7 +37,7 @@ public:
 	virtual void NotifyActorOnClicked(FKey ButtonPressed) override;
 
 	UFUNCTION(BlueprintCallable, Category = "Fortune")
-	void Interact();
+	virtual void Interact();
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UBoxComponent> ClickBox;
