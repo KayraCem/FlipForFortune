@@ -11,6 +11,7 @@ class UTextBlock;
 class UVerticalBox;
 class UFortuneCoinData;
 class AFortuneGachaChest;
+class UButton;
 
 UCLASS()
 class MYPROJECT_API UFortuneGachaRatesWidget : public UUserWidget
@@ -29,6 +30,35 @@ private:
 
 	UPROPERTY() TObjectPtr<UVerticalBox> List;
 	UPROPERTY() TObjectPtr<UTextBlock> CostText;
+};
+
+/** Sandiga tiklayinca acilan panel: tum coinlerin nadirlik ve sanslari + SUMMON butonu. */
+UCLASS()
+class MYPROJECT_API UFortuneSummonWidget : public UUserWidget
+{
+	GENERATED_BODY()
+
+public:
+	TWeakObjectPtr<AFortuneGachaChest> Chest;
+
+protected:
+	virtual TSharedRef<SWidget> RebuildWidget() override;
+	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
+
+private:
+	void BuildTree();
+	void Refresh();
+
+	UFUNCTION() void OnSummonClicked();
+	UFUNCTION() void OnCloseClicked();
+	UFUNCTION() void HandleMoneyChanged(double NewMoney);
+
+	UPROPERTY() TObjectPtr<UVerticalBox> List;
+	UPROPERTY() TObjectPtr<UTextBlock> MoneyText;
+	UPROPERTY() TObjectPtr<UTextBlock> SummonText;
+	UPROPERTY() TObjectPtr<UTextBlock> LuckText;
+	UPROPERTY() TObjectPtr<UButton> SummonButton;
 };
 
 UCLASS()

@@ -37,13 +37,39 @@ public:
 	UFUNCTION(Exec)
 	void GiveMoney(double Amount = 1000.0);
 
+	/** Sag tik basili + fare: etrafa bakma hassasiyeti. */
+	UPROPERTY(EditAnywhere, Category = "Fortune|Camera")
+	float LookSensitivity = 0.6f;
+
+	UPROPERTY(EditAnywhere, Category = "Fortune|Camera")
+	float MaxLookYaw = 80.f;
+
+	UPROPERTY(EditAnywhere, Category = "Fortune|Camera")
+	float MaxLookUp = 30.f;
+
+	UPROPERTY(EditAnywhere, Category = "Fortune|Camera")
+	float MaxLookDown = 25.f;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
+	virtual void PlayerTick(float DeltaTime) override;
 
 private:
 	void FlipPressed();
 	void AutoFlipPressed();
+	void LookPressed() { bLooking = true; }
+	void LookReleased() { bLooking = false; }
+	void ZoomIn() { TargetFOV = FMath::Clamp(TargetFOV - 4.f, 35.f, 85.f); }
+	void ZoomOut() { TargetFOV = FMath::Clamp(TargetFOV + 4.f, 35.f, 85.f); }
+	void ResetLook() { TargetYaw = 0.f; TargetPitch = 0.f; TargetFOV = BaseFOV; }
+
+	TWeakObjectPtr<class ACameraActor> MainCamera;
+	FRotator BaseRotation = FRotator::ZeroRotator;
+	float BaseFOV = 60.f;
+	float TargetYaw = 0.f, TargetPitch = 0.f, TargetFOV = 60.f;
+	float CurYaw = 0.f, CurPitch = 0.f;
+	bool bLooking = false;
 	void DebugScrollsPressed() { GiveScrolls(5); }
 	void DebugMoneyPressed() { GiveMoney(1000.0); }
 

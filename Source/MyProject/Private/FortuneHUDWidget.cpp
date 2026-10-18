@@ -90,6 +90,17 @@ void UFortuneHUDWidget::BuildTree()
 	WidgetTree->RootWidget = Root;
 	Root->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 
+	// Sol alt: kamera ipucu
+	UTextBlock* Hint = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("CameraHint"));
+	HudStyleText(Hint, 13, FLinearColor(1.f, 1.f, 1.f, 0.55f), false);
+	Hint->SetText(FText::FromString(TEXT("Sağ tık basılı: etrafa bak   •   Tekerlek: yakınlaş   •   R: sıfırla   •   Space: at   •   A: AutoFlip")));
+	Hint->SetVisibility(ESlateVisibility::HitTestInvisible);
+	UCanvasPanelSlot* HintSlot = Root->AddChildToCanvas(Hint);
+	HintSlot->SetAnchors(FAnchors(0.f, 1.f));
+	HintSlot->SetAlignment(FVector2D(0.f, 1.f));
+	HintSlot->SetPosition(FVector2D(18.f, -12.f));
+	HintSlot->SetAutoSize(true);
+
 	// Alt orta: [popup] + [para kapsulu]
 	UVerticalBox* Column = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("Column"));
 	UCanvasPanelSlot* ColumnSlot = Root->AddChildToCanvas(Column);

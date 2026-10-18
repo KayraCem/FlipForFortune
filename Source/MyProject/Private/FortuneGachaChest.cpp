@@ -185,10 +185,7 @@ void AFortuneGachaChest::SetLid(float Angle)
 void AFortuneGachaChest::NotifyActorBeginCursorOver()
 {
 	Super::NotifyActorBeginCursorOver();
-	if (State == EState::Idle)
-	{
-		ShowRates(true);
-	}
+	// Nadirlikler artik tiklayinca acilan Summon panelinde
 }
 
 void AFortuneGachaChest::NotifyActorEndCursorOver()
@@ -212,38 +209,48 @@ void AFortuneGachaChest::ShowRates(bool bShow)
 
 void AFortuneGachaChest::Interact()
 {
+	// Tiklayinca once Summon paneli acilir (nadirlikler + SUMMON butonu)
 	if (State != EState::Idle) return;
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	AFortunePlayerController* FPC = Cast<AFortunePlayerController>(PC);
+	if (!PC || (FPC && FPC->IsMenuOpen())) return;
+
+	ShowRates(false);
+	if (UFortuneSummonWidget* W = CreateWidget<UFortuneSummonWidget>(PC, UFortuneSummonWidget::StaticClass()))
+	{
+		W->Chest = this;
+		W->AddToViewport(15);
+	}
+	OnInteracted();
+}
+
+bool AFortuneGachaChest::StartSummon()
+{
+	if (State != EState::Idle) return false;
 
 	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
 	AFortunePlayerController* FPC = Cast<AFortunePlayerController>(PC);
-	if (FPC && FPC->IsMenuOpen()) return;
 
 	const UGameInstance* GI = GetGameInstance();
 	UFortuneSubsystem* F = GI ? GI->GetSubsystem<UFortuneSubsystem>() : nullptr;
-	if (!F) return;
+	if (!F) return false;
 
 	UFortuneCoinData* Coin = nullptr;
 	bool bDup = false;
 	if (!F->SummonCoin(Coin, bDup) || !Coin)
 	{
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(3, 2.5f, FColor(255, 110, 110),
-				FString::Printf(TEXT("Yetersiz para! Gacha: $%.0f"), F->GetSummonCost()));
-		}
-		return;
+		return false;
 	}
 
 	WonCoin = Coin;
 	bWonDuplicate = bDup;
 	RarityColor = UFortuneSubsystem::GetRarityColor(Coin->Rarity);
-	ShowRates(false);
 	if (FPC) FPC->SetMenuOpen(true);
 
 	State = EState::Shake;
 	StateTime = 0.f;
 	if (ShakeSound) UGameplayStatics::PlaySound2D(this, ShakeSound);
-	OnInteracted();
+	return true;
 }
 
 void AFortuneGachaChest::Tick(float DeltaSeconds)

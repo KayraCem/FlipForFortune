@@ -91,31 +91,8 @@ namespace FortuneColUI
 		return Btn;
 	}
 
-	FLinearColor RarityColor(EFortuneRarity R)
-	{
-		switch (R)
-		{
-		case EFortuneRarity::Common:    return FLinearColor(0.82f, 0.78f, 0.72f);
-		case EFortuneRarity::Uncommon:  return FLinearColor(0.4f, 0.95f, 0.45f);
-		case EFortuneRarity::Rare:      return FLinearColor(0.35f, 0.65f, 1.f);
-		case EFortuneRarity::Epic:      return FLinearColor(0.75f, 0.4f, 1.f);
-		case EFortuneRarity::Legendary: return FLinearColor(1.f, 0.78f, 0.2f);
-		default:                        return FLinearColor(1.f, 0.3f, 0.35f);
-		}
-	}
-
-	FString RarityName(EFortuneRarity R)
-	{
-		switch (R)
-		{
-		case EFortuneRarity::Common:    return TEXT("COMMON");
-		case EFortuneRarity::Uncommon:  return TEXT("UNCOMMON");
-		case EFortuneRarity::Rare:      return TEXT("RARE");
-		case EFortuneRarity::Epic:      return TEXT("EPIC");
-		case EFortuneRarity::Legendary: return TEXT("LEGENDARY");
-		default:                        return TEXT("MYTHIC");
-		}
-	}
+	FLinearColor RarityColor(EFortuneRarity R) { return UFortuneSubsystem::GetRarityColor(R); }
+	FString RarityName(EFortuneRarity R) { return UFortuneSubsystem::GetRarityName(R); }
 
 	FString WithCommas(int64 N)
 	{

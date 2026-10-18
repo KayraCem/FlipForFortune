@@ -7,6 +7,7 @@
 #include "Engine/Engine.h"
 #include "Blueprint/UserWidget.h"
 #include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
 #include "EngineUtils.h"
 #include "Components/InputComponent.h"
 
@@ -39,6 +40,9 @@ void AFortunePlayerController::BeginPlay()
 	if (Cam)
 	{
 		SetViewTarget(Cam);
+		MainCamera = Cam;
+		BaseRotation = Cam->GetActorRotation();
+		BaseFOV = TargetFOV = Cam->GetCameraComponent()->FieldOfView;
 	}
 
 	if (IsLocalController() && HUDWidgetClass)
@@ -63,6 +67,12 @@ void AFortunePlayerController::SetupInputComponent()
 	Super::SetupInputComponent();
 	InputComponent->BindKey(EKeys::SpaceBar, IE_Pressed, this, &AFortunePlayerController::FlipPressed);
 	InputComponent->BindKey(EKeys::A, IE_Pressed, this, &AFortunePlayerController::AutoFlipPressed);
+	// Kamera: sag tik basili tut + fare = etrafa bak, tekerlek = yakinlas, R = sifirla
+	InputComponent->BindKey(EKeys::RightMouseButton, IE_Pressed, this, &AFortunePlayerController::LookPressed);
+	InputComponent->BindKey(EKeys::RightMouseButton, IE_Released, this, &AFortunePlayerController::LookReleased);
+	InputComponent->BindKey(EKeys::MouseScrollUp, IE_Pressed, this, &AFortunePlayerController::ZoomIn);
+	InputComponent->BindKey(EKeys::MouseScrollDown, IE_Pressed, this, &AFortunePlayerController::ZoomOut);
+	InputComponent->BindKey(EKeys::R, IE_Pressed, this, &AFortunePlayerController::ResetLook);
 #if !UE_BUILD_SHIPPING
 	// TEST: F5 = +5 Enchant Scroll, F6 = +1000 para
 	InputComponent->BindKey(EKeys::F5, IE_Pressed, this, &AFortunePlayerController::DebugScrollsPressed);
@@ -97,6 +107,29 @@ void AFortunePlayerController::GiveMoney(double Amount)
 			F->SaveProgress();
 		}
 	}
+}
+
+void AFortunePlayerController::PlayerTick(float DeltaTime)
+{
+	Super::PlayerTick(DeltaTime);
+
+	ACameraActor* Cam = MainCamera.Get();
+	if (!Cam || GetViewTarget() != Cam) return;   // menu / vitrin kamerasindayken dokunma
+
+	if (bLooking && !bMenuOpen)
+	{
+		float DX = 0.f, DY = 0.f;
+		GetInputMouseDelta(DX, DY);
+		TargetYaw = FMath::Clamp(TargetYaw + DX * LookSensitivity, -MaxLookYaw, MaxLookYaw);
+		TargetPitch = FMath::Clamp(TargetPitch + DY * LookSensitivity, -MaxLookDown, MaxLookUp);
+	}
+
+	CurYaw = FMath::FInterpTo(CurYaw, TargetYaw, DeltaTime, 10.f);
+	CurPitch = FMath::FInterpTo(CurPitch, TargetPitch, DeltaTime, 10.f);
+	Cam->SetActorRotation(FRotator(BaseRotation.Pitch + CurPitch, BaseRotation.Yaw + CurYaw, 0.f));
+
+	UCameraComponent* CC = Cam->GetCameraComponent();
+	CC->SetFieldOfView(FMath::FInterpTo(CC->FieldOfView, TargetFOV, DeltaTime, 8.f));
 }
 
 void AFortunePlayerController::SetMenuOpen(bool bOpen)

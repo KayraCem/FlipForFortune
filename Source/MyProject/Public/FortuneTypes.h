@@ -16,7 +16,10 @@ enum class EFortuneRarity : uint8
 	Rare,
 	Epic,
 	Legendary,
-	Mythic
+	Mythic,
+	Divine,
+	Celestial,
+	Secret
 };
 
 /** Oyuncunun parayla satin aldigi genel yukseltmeler. */

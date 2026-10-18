@@ -45,6 +45,18 @@ def enum_value(enum_cls, name):
     return None
 
 
+def import_normal(rel_file, dest_dir, name):
+    t = import_texture(rel_file, dest_dir, name)
+    if t:
+        try:
+            t.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_NORMALMAP)
+            t.set_editor_property("srgb", False)
+            eal.save_loaded_asset(t)
+        except Exception as e:
+            unreal.log_warning(f"Normal map ayari: {name}: {e}")
+    return t
+
+
 def import_texture(rel_file, dest_dir, name):
     """Proje klasorundeki PNG'yi Unreal dokusu olarak ice aktar."""
     try:
@@ -192,7 +204,48 @@ def make_coin_face_material():
     return mat
 
 
+
+def make_coin_face_material2():
+    """Kabartmali coin materyali: Face (renk) + FaceNormal (normal map) + Tint + Glow."""
+    path = f"{MAT_DIR}/M_CoinFace2"
+    if eal.does_asset_exist(path):
+        return unreal.load_asset(path)
+    mat = asset_tools.create_asset("M_CoinFace2", MAT_DIR, unreal.Material, unreal.MaterialFactoryNew())
+    tex = mel.create_material_expression(mat, unreal.MaterialExpressionTextureSampleParameter2D, -800, 0)
+    tex.set_editor_property("parameter_name", "Face")
+    tex.set_editor_property("texture", unreal.load_asset("/Engine/EngineResources/WhiteSquareTexture"))
+    nrm = mel.create_material_expression(mat, unreal.MaterialExpressionTextureSampleParameter2D, -800, 600)
+    nrm.set_editor_property("parameter_name", "FaceNormal")
+    nrm.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL)
+    nrm.set_editor_property("texture", unreal.load_asset("/Engine/EngineMaterials/FlatNormal"))
+    mel.connect_material_property(nrm, "RGB", unreal.MaterialProperty.MP_NORMAL)
+    tint = mel.create_material_expression(mat, unreal.MaterialExpressionVectorParameter, -800, 250)
+    tint.set_editor_property("parameter_name", "Tint")
+    tint.set_editor_property("default_value", unreal.LinearColor(1, 1, 1, 1))
+    glow = mel.create_material_expression(mat, unreal.MaterialExpressionScalarParameter, -800, 420)
+    glow.set_editor_property("parameter_name", "Glow")
+    glow.set_editor_property("default_value", 0.0)
+    mul = mel.create_material_expression(mat, unreal.MaterialExpressionMultiply, -450, 100)
+    mel.connect_material_expressions(tex, "RGB", mul, "A")
+    mel.connect_material_expressions(tint, "", mul, "B")
+    mel.connect_material_property(mul, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    emi = mel.create_material_expression(mat, unreal.MaterialExpressionMultiply, -250, 300)
+    mel.connect_material_expressions(mul, "", emi, "A")
+    mel.connect_material_expressions(glow, "", emi, "B")
+    mel.connect_material_property(emi, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    met = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -450, 450)
+    met.set_editor_property("r", 0.9)
+    mel.connect_material_property(met, "", unreal.MaterialProperty.MP_METALLIC)
+    rough = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -450, 520)
+    rough.set_editor_property("r", 0.28)
+    mel.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    mel.recompile_material(mat)
+    eal.save_loaded_asset(mat)
+    return mat
+
+
 make_coin_face_material()
+make_coin_face_material2()
 
 # Menu coin yagmuru ve efektler instanced mesh kullanir: materyallere izin ver (yoksa beyaz gorunur)
 for _path in eal.list_assets(MAT_DIR, recursive=False):
@@ -267,9 +320,42 @@ COINS = [
      "Dort yaprakli yoncanin damgasi var. Sans pesinden gelir."),
     ("DA_Coin_Phoenix", "Phoenix Coin", "LEGENDARY", 1.5, 40.0, 15.0, "MONEY_MULTIPLIER", 0.5, "Kazanc x1.5.", "phoenix",
      "Kulleriyle yeniden dogan anka kusu. Avucunda yanar."),
+    # ---- yeni coinler
+    ("DA_Coin_Copper", "Copper Coin", "COMMON", 90, 1.5, 0.6, "FLAT_MONEY_BONUS", 0.5, "Her atışta +0.5 para.", "bronze",
+     "Cebin dibinde unutulmuş beşlik. Az ama düzenli kazandırır."),
+    ("DA_Coin_Star", "Star Coin", "UNCOMMON", 45, 3.0, 1.2, "BONUS_CRIT_CHANCE", 0.03, "+%3 kritik şansı.", "silver",
+     "Gece gökyüzünden düşmüş bir yıldız parçası."),
+    ("DA_Coin_Ghost", "Ghost Coin", "RARE", 18, 8.0, 3.0, "TAILS_FULL_VALUE", 0.0, "Tura da tam değer verir.", "silver",
+     "Bazen elinin içinden geçer gibi olur. Turadan bile korkmaz."),
+    ("DA_Coin_Gear", "Gear Coin", "RARE", 16, 10.0, 3.5, "BONUS_HEAD_CHANCE", 0.04, "+%4 yazı şansı.", "silver",
+     "Saatçinin çekmecesinden çıkmış. Dişlileri hep yazıya döner."),
+    ("DA_Coin_Pumpkin", "Pumpkin Coin", "EPIC", 5, 20.0, 8.0, "BONUS_XP", 1.0, "Atış başına +1 XP.", "phoenix",
+     "Cadılar bayramından kalma. Hızla büyür, hızla güçlenir."),
+    ("DA_Coin_Calendar", "Calendar Coin", "MYTHIC", 0.4, 120.0, 40.0, "MONEY_MULTIPLIER", 1.0, "Kazanç x2.", "gold",
+     "Üstündeki kadran yılın her gününü sayar. Zaman paradır."),
+    ("DA_Coin_Angel", "Angel Coin", "DIVINE", 0.1, 300.0, 100.0, "BONUS_CRIT_MULTIPLY", 1.0, "Kritik çarpanı +1.", "gold",
+     "Bulutların üstünde basılmış. Her kritik vuruşu kutsar."),
+    ("DA_Coin_Galaxy", "Galaxy Coin", "CELESTIAL", 0.03, 800.0, 250.0, "BONUS_SCROLL_CHANCE", 3.0, "Enchant Scroll şansı x4.", "clover",
+     "İçinde dönen minik bir galaksi var. Şans yıldızların arasında."),
+    ("DA_Coin_Skull", "Skull Coin", "SECRET", 0.005, 2500.0, 800.0, "MONEY_MULTIPLIER", 3.0, "Kazanç x4.", "phoenix",
+     "Kimse nereden geldiğini bilmiyor. Sahibine servet, diğerlerine korku."),
 ]
+
+# Yeni coinlerin gorunusu: sekil, kenar rengi, seritteki renk, inis efekti
+STYLE = {
+    "Copper":   ("HEXAGON",   (0.7, 0.35, 0.18), (0.8, 0.42, 0.22), "DUST"),
+    "Star":     ("ROUND",     (0.45, 0.55, 0.85), (0.6, 0.7, 1.0), "SPARKS"),
+    "Ghost":    ("ROUND",     (0.55, 0.7, 0.95), (0.7, 0.85, 1.0), "SPARKS"),
+    "Gear":     ("GEAR",      (0.45, 0.48, 0.55), (0.65, 0.68, 0.74), "SPARKS"),
+    "Pumpkin":  ("SCALLOPED", (0.45, 0.38, 0.15), (1.0, 0.55, 0.12), "LEAVES"),
+    "Calendar": ("ROUND",     (0.75, 0.52, 0.12), (0.95, 0.72, 0.3), "GOLD_RING"),
+    "Angel":    ("SCALLOPED", (0.95, 0.85, 0.55), (1.0, 0.97, 0.85), "GOLD_RING"),
+    "Galaxy":   ("DECAGON",   (0.25, 0.12, 0.5), (0.45, 0.3, 0.9), "SPARKS"),
+    "Skull":    ("OCTAGON",   (0.18, 0.06, 0.15), (0.35, 0.15, 0.3), "FLAME"),
+}
 if not eal.does_directory_exist(COIN_DIR):
     eal.make_directory(COIN_DIR)
+import_normal("Art/Coins/T_Coin_RimNormal.png", COIN_DIR + "/Textures", "T_Coin_RimNormal")
 for cid, name, rarity, weight, base, per, ptype, pval, ptext, mat, desc in COINS:
     path = f"{COIN_DIR}/{cid}"
     if eal.does_asset_exist(path):
@@ -288,13 +374,16 @@ for cid, name, rarity, weight, base, per, ptype, pval, ptext, mat, desc in COINS
     da.set_editor_property("passive_value", float(pval))
     da.set_editor_property("passive_description", unreal.Text(ptext))
     da.set_editor_property("coin_material", M[mat])
-    icon = {"bronze": (0.62, 0.36, 0.18), "silver": (0.85, 0.86, 0.9), "gold": (1.0, 0.72, 0.25),
+    ck = cid.replace("DA_Coin_", "")
+    icon = STYLE[ck][2] if ck in STYLE else {"bronze": (0.62, 0.36, 0.18), "silver": (0.85, 0.86, 0.9), "gold": (1.0, 0.72, 0.25),
             "clover": (0.2, 0.75, 0.35), "phoenix": (1.0, 0.35, 0.08)}.get(mat, (0.9, 0.7, 0.3))
     da.set_editor_property("icon_color", unreal.LinearColor(icon[0], icon[1], icon[2], 1.0))
     # Sekil + yazi/tura yuz resimleri (Art/Coins/*.png)
     try:
         coin_key = cid.replace("DA_Coin_", "")
         shape = {"Bronze": "ROUND", "Silver": "OCTAGON", "Gold": "SCALLOPED", "Clover": "DECAGON", "Phoenix": "GEAR"}.get(coin_key, "ROUND")
+        if coin_key in STYLE:
+            shape = STYLE[coin_key][0]
         sv = enum_value(unreal.FortuneCoinShape, shape)
         if sv is not None:
             da.set_editor_property("shape", sv)
@@ -302,12 +391,19 @@ for cid, name, rarity, weight, base, per, ptype, pval, ptext, mat, desc in COINS
             t = import_texture(f"Art/Coins/T_Coin_{coin_key}_{side}.png", COIN_DIR + "/Textures", f"T_Coin_{coin_key}_{side}")
             if t:
                 da.set_editor_property(prop, t)
+            n = import_normal(f"Art/Coins/T_Coin_{coin_key}_{side}_N.png", COIN_DIR + "/Textures", f"T_Coin_{coin_key}_{side}_N")
+            if n:
+                da.set_editor_property("heads_normal" if side == "Heads" else "tails_normal", n)
         rim = {"Bronze": (0.55, 0.3, 0.12), "Silver": (0.7, 0.72, 0.78), "Gold": (0.95, 0.65, 0.15),
                "Clover": (0.75, 0.65, 0.3), "Phoenix": (0.8, 0.3, 0.08)}.get(coin_key, (0.75, 0.5, 0.15))
+        if coin_key in STYLE:
+            rim = STYLE[coin_key][1]
         da.set_editor_property("rim_color", unreal.LinearColor(rim[0], rim[1], rim[2], 1.0))
     except Exception as e:
         unreal.log_warning(f"Coin gorunumu ayarlanamadi ({cid}): {e}")
     land = {"bronze": "DUST", "silver": "SPARKS", "gold": "GOLD_RING", "clover": "LEAVES", "phoenix": "FLAME"}.get(mat, "DUST")
+    if ck in STYLE:
+        land = STYLE[ck][3]
     try:
         val = enum_value(unreal.FortuneLandFX, land)
         if val is not None:

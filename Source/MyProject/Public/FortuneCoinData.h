@@ -85,6 +85,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
 	TObjectPtr<UTexture2D> TailsTexture = nullptr;
 
+	/** Yazi yuzu kabartma (normal map). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
+	TObjectPtr<UTexture2D> HeadsNormal = nullptr;
+
+	/** Tura yuzu kabartma (normal map). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
+	TObjectPtr<UTexture2D> TailsNormal = nullptr;
+
 	/** Kenar (yan yuz) rengi. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
 	FLinearColor RimColor = FLinearColor(0.75f, 0.5f, 0.15f);

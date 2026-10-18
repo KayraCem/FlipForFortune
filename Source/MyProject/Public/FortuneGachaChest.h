@@ -32,6 +32,11 @@ public:
 	/** "YENI!" ekrani kapaninca cagrilir. */
 	void FinishReveal();
 
+	/** Summon panelindeki SUMMON butonu: para harcar ve acilis animasyonunu baslatir. false = yetersiz para. */
+	bool StartSummon();
+
+	bool IsBusy() const { return State != EState::Idle; }
+
 	UPROPERTY(EditAnywhere, Category = "Gacha")
 	TObjectPtr<USoundBase> ShakeSound;
 
