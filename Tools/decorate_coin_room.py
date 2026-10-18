@@ -153,7 +153,7 @@ M = {
     "piggy": make_material("M_PiggyPink", (0.95, 0.45, 0.58), 0.0, 0.25),
     "piggy_dark": make_material("M_PiggyPinkDark", (0.8, 0.32, 0.45), 0.0, 0.35),
     "spell_cover": make_material("M_SpellCover", (0.2, 0.04, 0.3), 0.0, 0.5),
-    "rune": make_material("M_Rune", (0.6, 0.3, 1.0), 0.0, 0.4, emissive=(4.0, 1.6, 8.0)),
+    "rune": make_material("M_RuneSoft", (0.6, 0.3, 1.0), 0.0, 0.4, emissive=(0.9, 0.35, 1.8)),
 }
 
 
@@ -238,7 +238,10 @@ def interactable(label, action, text, loc, extent):
     a = actors.spawn_actor_from_class(unreal.FortuneInteractable, V(*loc), R())
     a.set_actor_label(label)
     a.set_folder_path("Interactables")
-    a.set_editor_property("action", action)
+    if action is not None:
+        a.set_editor_property("action", action)
+    else:
+        unreal.log_warning(f"{label}: bu eylem C++'ta yok (projeyi derledin mi?). Esya tiklanmayacak.")
     a.set_editor_property("label", unreal.Text(text))
     a.get_editor_property("click_box").set_box_extent(V(*extent))
     return a
@@ -376,7 +379,7 @@ part("Spell_Spine", CYL, (s_x, s_y, TABLE_Z + 3.0), (2.2, 2.2, 13), M["gold"], r
 part("Spell_RuneL", CYL, (s_x, s_y - 6.0, TABLE_Z + 4.75), (6, 6, 0.2), M["rune"], rot=R(roll=-10), parent=spell)
 part("Spell_RuneR", CUBE, (s_x, s_y + 6.0, TABLE_Z + 4.75), (7, 5, 0.2), M["rune"], rot=R(roll=10, yaw=45), parent=spell)
 part("Spell_Orb", SPH, (s_x, s_y, TABLE_Z + 12), (2.5, 2.5, 2.5), M["rune"], parent=spell)
-point_light("Light_Spell", (s_x, s_y, TABLE_Z + 12), 400.0, 90.0, (0.7, 0.35, 1.0), shadows=False)
+point_light("Light_Spell", (s_x, s_y, TABLE_Z + 12), 120.0, 50.0, (0.7, 0.35, 1.0), shadows=False)
 
 # ---------------------------------------------------------------- 7) Dekor: para kuleleri, mum, masa lambasi
 for s, (sx, sy, n) in enumerate([(-24, 30, 6), (-18, 35, 4), (-28, 36, 3)]):

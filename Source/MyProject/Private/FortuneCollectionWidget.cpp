@@ -279,7 +279,8 @@ void UFortuneCollectionWidget::BuildTree()
 	EnchantText = ColText(T, TEXT("ENCHANT"), 22, FLinearColor(0.85f, 0.7f, 1.f));
 	EnchantButton = ColButton(T, EnchantText, FLinearColor(0.7f, 0.45f, 1.f));
 	EnchantButton->OnClicked.AddDynamic(this, &UFortuneCollectionWidget::OnEnchantClicked);
-	AddButton(EnchantButton);
+	// Enchant artik sadece masadaki buyu kitabindan yapiliyor; buton gosterilmiyor
+	EnchantButton->SetVisibility(ESlateVisibility::Collapsed);
 
 	// ===== Sag kolon: BILGILER
 	UVerticalBox* Right = T->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("Right"));
@@ -650,7 +651,7 @@ void UFortuneCollectionWidget::RefreshDetails()
 		}
 		else if (!E.bEnchanted)
 		{
-			Body = TEXT("Bu coinde enchant yok.\n\nAşağıdaki ENCHANT butonuyla bir Enchant Scroll kullanarak coine rastgele bir güç verebilirsin.");
+			Body = TEXT("Bu coinde enchant yok.\n\nMasadaki büyü kitabına tıklayıp bir Enchant Scroll kullanarak coine rastgele bir güç verebilirsin.");
 		}
 		else
 		{

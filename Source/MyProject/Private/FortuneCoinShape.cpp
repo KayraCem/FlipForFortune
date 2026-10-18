@@ -103,9 +103,9 @@ void FFortuneCoinShapeBuilder::Build(UProceduralMeshComponent* PMC, EFortuneCoin
 		for (int32 i = 0; i < N; ++i)
 		{
 			const int32 A = 1 + i, B = 1 + (i + 1) % N;
-			// UE: bakan kisiye gore saat yonu = on yuz
-			if (bTop) { Tri.Add(0); Tri.Add(A); Tri.Add(B); }
-			else      { Tri.Add(0); Tri.Add(B); Tri.Add(A); }
+			// Ucgen sirasi: yuzler disa baksin (UE'de ters sira icten gorunur)
+			if (bTop) { Tri.Add(0); Tri.Add(B); Tri.Add(A); }
+			else      { Tri.Add(0); Tri.Add(A); Tri.Add(B); }
 		}
 		PMC->CreateMeshSection(Side, V, Tri, Nrm, UV, TArray<FColor>(), Tan, false);
 	}
@@ -140,8 +140,8 @@ void FFortuneCoinShapeBuilder::Build(UProceduralMeshComponent* PMC, EFortuneCoin
 			UV.Add(FVector2D(U0 * 8.f, 0.f)); UV.Add(FVector2D(U0 * 8.f, 1.f));
 			UV.Add(FVector2D(U1 * 8.f, 0.f)); UV.Add(FVector2D(U1 * 8.f, 1.f));
 			for (int32 k = 0; k < 4; ++k) Tan.Add(FProcMeshTangent(0.f, 0.f, 1.f));
-			Tri.Add(Base + 0); Tri.Add(Base + 1); Tri.Add(Base + 2);
-			Tri.Add(Base + 2); Tri.Add(Base + 1); Tri.Add(Base + 3);
+			Tri.Add(Base + 0); Tri.Add(Base + 2); Tri.Add(Base + 1);
+			Tri.Add(Base + 2); Tri.Add(Base + 3); Tri.Add(Base + 1);
 		}
 		PMC->CreateMeshSection(2, V, Tri, Nrm, UV, TArray<FColor>(), Tan, false);
 	}

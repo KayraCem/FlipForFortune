@@ -23,10 +23,10 @@
 
 namespace
 {
-	const FLinearColor Gold(1.f, 0.76f, 0.28f, 1.f);
-	const FLinearColor DarkGold(0.45f, 0.28f, 0.05f, 1.f);
+	const FLinearColor HudGold(1.f, 0.76f, 0.28f, 1.f);
+	const FLinearColor HudDarkGold(0.45f, 0.28f, 0.05f, 1.f);
 
-	FSlateBrush RoundedBrush(const FLinearColor& Fill, const FLinearColor& Outline, float Radius, float OutlineWidth, FVector2D Size = FVector2D(32.f, 32.f))
+	FSlateBrush HudRoundedBrush(const FLinearColor& Fill, const FLinearColor& Outline, float Radius, float OutlineWidth, FVector2D Size = FVector2D(32.f, 32.f))
 	{
 		FSlateBrush B;
 		B.DrawAs = ESlateBrushDrawType::RoundedBox;
@@ -37,7 +37,7 @@ namespace
 		return B;
 	}
 
-	void StyleText(UTextBlock* T, int32 Size, const FLinearColor& Color, bool bBold)
+	void HudStyleText(UTextBlock* T, int32 Size, const FLinearColor& Color, bool bBold)
 	{
 		FSlateFontInfo F = T->GetFont();
 		F.Size = Size;
@@ -100,7 +100,7 @@ void UFortuneHUDWidget::BuildTree()
 	Column->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 
 	LevelUpText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("LevelUp"));
-	StyleText(LevelUpText, 26, FLinearColor(0.35f, 0.9f, 1.f, 1.f), true);
+	HudStyleText(LevelUpText, 26, FLinearColor(0.35f, 0.9f, 1.f, 1.f), true);
 	LevelUpText->SetJustification(ETextJustify::Center);
 	LevelUpText->SetRenderOpacity(0.f);
 	LevelUpText->SetVisibility(ESlateVisibility::HitTestInvisible);
@@ -109,7 +109,7 @@ void UFortuneHUDWidget::BuildTree()
 	LevelSlot->SetPadding(FMargin(0.f, 0.f, 0.f, 2.f));
 
 	PopupText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Popup"));
-	StyleText(PopupText, 28, Gold, true);
+	HudStyleText(PopupText, 28, HudGold, true);
 	PopupText->SetJustification(ETextJustify::Center);
 	PopupText->SetRenderOpacity(0.f);
 	PopupText->SetVisibility(ESlateVisibility::HitTestInvisible);
@@ -119,7 +119,7 @@ void UFortuneHUDWidget::BuildTree()
 
 	// Kapsul
 	UBorder* Pill = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("MoneyPill"));
-	Pill->SetBrush(RoundedBrush(FLinearColor(0.03f, 0.02f, 0.01f, 0.78f), FLinearColor(1.f, 0.72f, 0.25f, 0.85f), 26.f, 2.f));
+	Pill->SetBrush(HudRoundedBrush(FLinearColor(0.03f, 0.02f, 0.01f, 0.78f), FLinearColor(1.f, 0.72f, 0.25f, 0.85f), 26.f, 2.f));
 	Pill->SetPadding(FMargin(12.f, 8.f, 12.f, 8.f));
 	Pill->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	UVerticalBoxSlot* PillSlot = Column->AddChildToVerticalBox(Pill);
@@ -136,13 +136,13 @@ void UFortuneHUDWidget::BuildTree()
 	UOverlay* CoinOverlay = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("CoinOverlay"));
 	CoinBox->SetContent(CoinOverlay);
 	UImage* CoinImg = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("CoinIcon"));
-	CoinImg->SetBrush(RoundedBrush(Gold, DarkGold, 20.f, 3.f, FVector2D(40.f, 40.f)));
+	CoinImg->SetBrush(HudRoundedBrush(HudGold, HudDarkGold, 20.f, 3.f, FVector2D(40.f, 40.f)));
 	UOverlaySlot* ImgSlot = CoinOverlay->AddChildToOverlay(CoinImg);
 	ImgSlot->SetHorizontalAlignment(HAlign_Fill);
 	ImgSlot->SetVerticalAlignment(VAlign_Fill);
 	UTextBlock* CoinSign = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("CoinSign"));
 	CoinSign->SetText(FText::FromString(TEXT("$")));
-	StyleText(CoinSign, 20, DarkGold, true);
+	HudStyleText(CoinSign, 20, HudDarkGold, true);
 	CoinSign->SetShadowOffset(FVector2D::ZeroVector);
 	UOverlaySlot* SignSlot = CoinOverlay->AddChildToOverlay(CoinSign);
 	SignSlot->SetHorizontalAlignment(HAlign_Center);
@@ -153,7 +153,7 @@ void UFortuneHUDWidget::BuildTree()
 
 	// Para miktari
 	MoneyText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Money"));
-	StyleText(MoneyText, 30, Gold, true);
+	HudStyleText(MoneyText, 30, HudGold, true);
 	MoneyText->SetText(FText::FromString(TEXT("0")));
 	MoneyText->SetVisibility(ESlateVisibility::HitTestInvisible);
 	UHorizontalBoxSlot* MoneySlot = Row->AddChildToHorizontalBox(MoneyText);
@@ -161,36 +161,36 @@ void UFortuneHUDWidget::BuildTree()
 
 	// Ayirici + Enchant Scroll sayisi
 	UImage* Divider = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("Divider"));
-	Divider->SetBrush(RoundedBrush(FLinearColor(1.f, 0.72f, 0.25f, 0.35f), FLinearColor::Transparent, 1.f, 0.f, FVector2D(2.f, 28.f)));
+	Divider->SetBrush(HudRoundedBrush(FLinearColor(1.f, 0.72f, 0.25f, 0.35f), FLinearColor::Transparent, 1.f, 0.f, FVector2D(2.f, 28.f)));
 	UHorizontalBoxSlot* DivSlot = Row->AddChildToHorizontalBox(Divider);
 	DivSlot->SetVerticalAlignment(VAlign_Center);
 	DivSlot->SetPadding(FMargin(20.f, 0.f, 16.f, 0.f));
 
 	UImage* ScrollIcon = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("ScrollIcon"));
-	ScrollIcon->SetBrush(RoundedBrush(FLinearColor(0.55f, 0.3f, 0.95f, 1.f), FLinearColor(0.85f, 0.7f, 1.f, 1.f), 4.f, 2.f, FVector2D(18.f, 24.f)));
+	ScrollIcon->SetBrush(HudRoundedBrush(FLinearColor(0.55f, 0.3f, 0.95f, 1.f), FLinearColor(0.85f, 0.7f, 1.f, 1.f), 4.f, 2.f, FVector2D(18.f, 24.f)));
 	UHorizontalBoxSlot* ScrollIconSlot = Row->AddChildToHorizontalBox(ScrollIcon);
 	ScrollIconSlot->SetVerticalAlignment(VAlign_Center);
 	ScrollIconSlot->SetPadding(FMargin(0.f, 0.f, 8.f, 0.f));
 
 	ScrollText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Scrolls"));
-	StyleText(ScrollText, 20, FLinearColor(0.85f, 0.75f, 1.f, 1.f), true);
+	HudStyleText(ScrollText, 20, FLinearColor(0.85f, 0.75f, 1.f, 1.f), true);
 	ScrollText->SetText(FText::FromString(TEXT("x0")));
 	UHorizontalBoxSlot* ScrollSlot = Row->AddChildToHorizontalBox(ScrollText);
 	ScrollSlot->SetVerticalAlignment(VAlign_Center);
 
 	// Ayirici + AUTO FLIP butonu
 	UImage* Divider2 = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("Divider2"));
-	Divider2->SetBrush(RoundedBrush(FLinearColor(1.f, 0.72f, 0.25f, 0.35f), FLinearColor::Transparent, 1.f, 0.f, FVector2D(2.f, 28.f)));
+	Divider2->SetBrush(HudRoundedBrush(FLinearColor(1.f, 0.72f, 0.25f, 0.35f), FLinearColor::Transparent, 1.f, 0.f, FVector2D(2.f, 28.f)));
 	UHorizontalBoxSlot* Div2Slot = Row->AddChildToHorizontalBox(Divider2);
 	Div2Slot->SetVerticalAlignment(VAlign_Center);
 	Div2Slot->SetPadding(FMargin(16.f, 0.f, 12.f, 0.f));
 
 	AutoButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("AutoFlipButton"));
 	FButtonStyle Style;
-	Style.SetNormal(RoundedBrush(FLinearColor(1.f, 1.f, 1.f, 0.06f), FLinearColor(1.f, 0.72f, 0.25f, 0.5f), 14.f, 1.5f));
-	Style.SetHovered(RoundedBrush(FLinearColor(1.f, 0.85f, 0.4f, 0.18f), FLinearColor(1.f, 0.8f, 0.35f, 1.f), 14.f, 1.5f));
-	Style.SetPressed(RoundedBrush(FLinearColor(1.f, 0.85f, 0.4f, 0.3f), FLinearColor(1.f, 0.8f, 0.35f, 1.f), 14.f, 2.f));
-	Style.SetDisabled(RoundedBrush(FLinearColor(0.f, 0.f, 0.f, 0.2f), FLinearColor(0.5f, 0.5f, 0.5f, 0.4f), 14.f, 1.f));
+	Style.SetNormal(HudRoundedBrush(FLinearColor(1.f, 1.f, 1.f, 0.06f), FLinearColor(1.f, 0.72f, 0.25f, 0.5f), 14.f, 1.5f));
+	Style.SetHovered(HudRoundedBrush(FLinearColor(1.f, 0.85f, 0.4f, 0.18f), FLinearColor(1.f, 0.8f, 0.35f, 1.f), 14.f, 1.5f));
+	Style.SetPressed(HudRoundedBrush(FLinearColor(1.f, 0.85f, 0.4f, 0.3f), FLinearColor(1.f, 0.8f, 0.35f, 1.f), 14.f, 2.f));
+	Style.SetDisabled(HudRoundedBrush(FLinearColor(0.f, 0.f, 0.f, 0.2f), FLinearColor(0.5f, 0.5f, 0.5f, 0.4f), 14.f, 1.f));
 	Style.SetNormalPadding(FMargin(10.f, 4.f));
 	Style.SetPressedPadding(FMargin(10.f, 5.f, 10.f, 3.f));
 	AutoButton->SetStyle(Style);
@@ -213,7 +213,7 @@ void UFortuneHUDWidget::BuildTree()
 	LightSlot->SetPadding(FMargin(0.f, 0.f, 8.f, 0.f));
 
 	AutoText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("AutoText"));
-	StyleText(AutoText, 16, FLinearColor::White, true);
+	HudStyleText(AutoText, 16, FLinearColor::White, true);
 	AutoText->SetText(FText::FromString(TEXT("AUTO")));
 	UHorizontalBoxSlot* AutoTextSlot = AutoRow->AddChildToHorizontalBox(AutoText);
 	AutoTextSlot->SetVerticalAlignment(VAlign_Center);
@@ -248,7 +248,7 @@ void UFortuneHUDWidget::RefreshAutoFlip()
 		Light = FLinearColor(0.9f, 0.25f, 0.2f, 1.f);
 		AutoButton->SetIsEnabled(true);
 	}
-	AutoLight->SetBrush(RoundedBrush(Light, FLinearColor(0.f, 0.f, 0.f, 0.4f), 6.f, 1.f, FVector2D(12.f, 12.f)));
+	AutoLight->SetBrush(HudRoundedBrush(Light, FLinearColor(0.f, 0.f, 0.f, 0.4f), 6.f, 1.f, FVector2D(12.f, 12.f)));
 }
 
 void UFortuneHUDWidget::HandleAutoClicked()
@@ -344,7 +344,7 @@ void UFortuneHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTim
 			HeldBack = 0.0;
 			PopupAge = 0.f;
 			const FText Amount = FormatMoney(Pending.MoneyEarned);
-			FLinearColor Color = Pending.bHeads ? Gold : FLinearColor(0.75f, 0.75f, 0.75f, 1.f);
+			FLinearColor Color = Pending.bHeads ? HudGold : FLinearColor(0.75f, 0.75f, 0.75f, 1.f);
 			const FText Side = Pending.bHeads ? LOCTEXT("Heads", "YAZI") : LOCTEXT("Tails", "TURA");
 			FText Msg = FText::Format(LOCTEXT("Plus", "{0}!  +{1}"), Side, Amount);
 			if (Pending.bJackpot)

@@ -4,6 +4,7 @@
 #include "FortuneCoinFlipper.h"
 #include "FortuneCollectionWidget.h"
 #include "FortuneUpgradeWidget.h"
+#include "FortuneInventoryWidget.h"
 #include "FortuneMenuWidgets.h"
 #include "FortunePlayerController.h"
 #include "Components/BoxComponent.h"
@@ -114,14 +115,15 @@ void AFortuneInteractable::Interact()
 			break;
 		}
 	}
-	else if (WidgetClass || Action == EFortuneInteraction::CoinCollection || Action == EFortuneInteraction::Upgrades)
+	else if (WidgetClass || Action == EFortuneInteraction::CoinCollection || Action == EFortuneInteraction::Upgrades
+		|| Action == EFortuneInteraction::Inventory)
 	{
 		TSubclassOf<UUserWidget> Cls = WidgetClass;
 		if (!Cls)
 		{
-			Cls = (Action == EFortuneInteraction::Upgrades)
-				? TSubclassOf<UUserWidget>(UFortuneUpgradeWidget::StaticClass())
-				: TSubclassOf<UUserWidget>(UFortuneCollectionWidget::StaticClass());
+			if (Action == EFortuneInteraction::Upgrades) Cls = UFortuneUpgradeWidget::StaticClass();
+			else if (Action == EFortuneInteraction::Inventory) Cls = UFortuneInventoryWidget::StaticClass();
+			else Cls = UFortuneCollectionWidget::StaticClass();
 		}
 		APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
 		if (OpenWidget && OpenWidget->IsInViewport())
@@ -157,13 +159,13 @@ void AFortuneInteractable::ShowDebugInfo() const
 	UFortuneSubsystem* F = GI ? GI->GetSubsystem<UFortuneSubsystem>() : nullptr;
 	if (!F || !GEngine) return;
 
-	const FColor Gold(255, 200, 80);
+	const FColor DebugGold(255, 200, 80);
 	GEngine->ClearOnScreenDebugMessages();   // ust uste binmesin
 	int32 Key = 1000;
 	switch (Action)
 	{
 	case EFortuneInteraction::Inventory:
-		GEngine->AddOnScreenDebugMessage(Key++, 4.f, Gold, FString::Printf(TEXT("ENVANTER  |  Enchant Scroll: %d"),
+		GEngine->AddOnScreenDebugMessage(Key++, 4.f, DebugGold, FString::Printf(TEXT("ENVANTER  |  Enchant Scroll: %d"),
 			F->GetItemCount(EFortuneItemType::EnchantScroll)));
 		break;
 
@@ -171,7 +173,7 @@ void AFortuneInteractable::ShowDebugInfo() const
 		for (const FFortuneCollectionEntry& E : F->GetCollection())
 		{
 			if (!E.Coin) continue;
-			GEngine->AddOnScreenDebugMessage(Key++, 6.f, E.bOwned ? Gold : FColor::Silver,
+			GEngine->AddOnScreenDebugMessage(Key++, 6.f, E.bOwned ? DebugGold : FColor::Silver,
 				E.bOwned
 				? FString::Printf(TEXT("%s  Lv%d  (%d/%d XP)  Deger %.1f  %s"), *E.Coin->DisplayName.ToString(), E.Level, E.XP,
 					E.XPForNextLevel, E.CurrentValue, *E.EnchantText.ToString())
@@ -186,7 +188,7 @@ void AFortuneInteractable::ShowDebugInfo() const
 		for (int32 i = 0; i < Enum->NumEnums() - 1; ++i)
 		{
 			const EFortuneUpgradeType U = (EFortuneUpgradeType)Enum->GetValueByIndex(i);
-			GEngine->AddOnScreenDebugMessage(Key++, 5.f, Gold, FString::Printf(TEXT("%s  Lv%d  ->  %.0f"),
+			GEngine->AddOnScreenDebugMessage(Key++, 5.f, DebugGold, FString::Printf(TEXT("%s  Lv%d  ->  %.0f"),
 				*Enum->GetDisplayNameTextByIndex(i).ToString(), F->GetUpgradeLevel(U), F->GetUpgradeCost(U)));
 		}
 		GEngine->AddOnScreenDebugMessage(Key++, 5.f, FColor::White, FString::Printf(TEXT("YUKSELTMELER  |  Para: %.0f"), F->GetMoney()));
@@ -199,7 +201,7 @@ void AFortuneInteractable::ShowDebugInfo() const
 		bool bDup = false;
 		if (F->SummonCoin(Coin, bDup) && Coin)
 		{
-			GEngine->AddOnScreenDebugMessage(Key++, 4.f, Gold, FString::Printf(TEXT("GACHA: %s %s"),
+			GEngine->AddOnScreenDebugMessage(Key++, 4.f, DebugGold, FString::Printf(TEXT("GACHA: %s %s"),
 				*Coin->DisplayName.ToString(), bDup ? TEXT("(tekrar, +XP)") : TEXT("(YENI!)")));
 		}
 		else
