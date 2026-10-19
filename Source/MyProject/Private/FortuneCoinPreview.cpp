@@ -1,6 +1,7 @@
 #include "FortuneCoinPreview.h"
 #include "FortuneCoinData.h"
 #include "FortuneCoinShape.h"
+#include "FortuneCoinAura.h"
 #include "ProceduralMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
@@ -59,6 +60,9 @@ AFortuneCoinPreview::AFortuneCoinPreview()
 	ShapedCoin->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	ShapedCoin->SetVisibility(false);
 
+	CoinAura = CreateDefaultSubobject<UFortuneCoinAuraComponent>(TEXT("CoinAura"));
+	CoinAura->SetupAttachment(Spinner);
+
 	KeyLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("KeyLight"));
 	KeyLight->SetupAttachment(Root);
 	KeyLight->SetRelativeLocation(FVector(-12.f, -8.f, 10.f));
@@ -107,6 +111,10 @@ void AFortuneCoinPreview::SetCoin(const UFortuneCoinData* Coin, bool bOwned, boo
 	// Yuz resimleri olan coin: sekilli model (bulunmamissa siyah siluet)
 	const bool bShaped = Coin && !Coin->CoinMesh && FFortuneCoinShapeBuilder::BuildForCoin(ShapedCoin, Coin, bOwned, bEnchanted);
 	ShapedCoin->SetVisibility(bShaped);
+	if (CoinAura)
+	{
+		CoinAura->SetAura((bShaped && bOwned) ? Coin->Aura : EFortuneCoinAura::None, Coin ? Coin->AuraColor : FLinearColor::White);
+	}
 	if (bShaped)
 	{
 		CoinMesh->SetVisibility(false);

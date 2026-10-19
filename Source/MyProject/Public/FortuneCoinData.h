@@ -93,6 +93,30 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
 	TObjectPtr<UTexture2D> TailsNormal = nullptr;
 
+	/** Yazi yuzunun isik saçan kismi (siyah = isik yok). Neon cizgiler, lav catlaklari vb. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual|Glow")
+	TObjectPtr<UTexture2D> HeadsGlow = nullptr;
+
+	/** Tura yuzunun isik saçan kismi. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual|Glow")
+	TObjectPtr<UTexture2D> TailsGlow = nullptr;
+
+	/** Neon parlama rengi (glow dokusuyla carpilir). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual|Glow")
+	FLinearColor GlowColor = FLinearColor(1.f, 0.6f, 0.2f);
+
+	/** Neon parlama gucu (0 = kapali). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual|Glow", meta = (ClampMin = "0"))
+	float GlowStrength = 0.f;
+
+	/** Coinin etrafinda surekli oynayan tema efekti. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual|Glow")
+	EFortuneCoinAura Aura = EFortuneCoinAura::None;
+
+	/** Aura efektinin ana rengi. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual|Glow")
+	FLinearColor AuraColor = FLinearColor(1.f, 0.45f, 0.1f);
+
 	/** Kenar (yan yuz) rengi. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
 	FLinearColor RimColor = FLinearColor(0.75f, 0.5f, 0.15f);

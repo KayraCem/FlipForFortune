@@ -3,7 +3,10 @@
 #include "FortuneCoinData.h"
 #include "FortuneSettings.h"
 #include "FortuneLandFX.h"
+#include "FortuneHandActor.h"
+#include "EngineUtils.h"
 #include "FortuneCoinShape.h"
+#include "FortuneCoinAura.h"
 #include "ProceduralMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -69,6 +72,9 @@ AFortuneCoinFlipper::AFortuneCoinFlipper()
 	ShapedCoin->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	ShapedCoin->SetVisibility(false);
 
+	CoinAura = CreateDefaultSubobject<UFortuneCoinAuraComponent>(TEXT("CoinAura"));
+	CoinAura->SetupAttachment(CoinPivot);
+
 	EnchantFX = CreateDefaultSubobject<UNiagaraComponent>(TEXT("EnchantFX"));
 	EnchantFX->SetupAttachment(CoinPivot);
 	EnchantFX->SetAutoActivate(false);
@@ -88,6 +94,18 @@ void AFortuneCoinFlipper::BeginPlay()
 {
 	Super::BeginPlay();
 	RestTransform = CoinPivot->GetRelativeTransform();
+	if (!Hand)
+	{
+		for (TActorIterator<AFortuneHandActor> It(GetWorld()); It; ++It)
+		{
+			Hand = *It;
+			break;
+		}
+	}
+	if (Hand)
+	{
+		HandCoin = EHandCoin::InHand;   // oyun basinda coin elde hazir
+	}
 
 	// Yuz renkleri (motorun BasicShapeMaterial'inin "Color" parametresi)
 	auto Tint = [this](UStaticMeshComponent* C, const FLinearColor& Color)
@@ -146,6 +164,10 @@ void AFortuneCoinFlipper::RefreshCoinVisuals()
 	const bool bShaped = !Coin->CoinMesh && FFortuneCoinShapeBuilder::BuildForCoin(ShapedCoin, Coin, true, Owned.Enchant.IsActive());
 	ShapedCoin->SetVisibility(bShaped);
 	CoinMesh->SetVisibility(!bShaped);
+	if (CoinAura)
+	{
+		CoinAura->SetAura(bShaped ? Coin->Aura : EFortuneCoinAura::None, Coin->AuraColor);
+	}
 	const bool bShowFaces = (Coin->CoinMesh == nullptr) && !bShaped;
 	HeadsFace->SetVisibility(bShowFaces);
 	HeadsGem->SetVisibility(bShowFaces);
@@ -187,6 +209,16 @@ bool AFortuneCoinFlipper::Flip(bool bManual)
 	}
 	Elapsed = 0.f;
 	Delay = 0.f;
+	PreTime = 0.f;
+	if (Hand)
+	{
+		// Hizli atislarda el hareketleri de kisalir
+		const float S = FMath::Clamp(Current.FlipDuration / 1.2f, 0.35f, 1.f);
+		ReturnDur = (HandCoin == EHandCoin::InHand) ? 0.f : 0.22f * S;
+		WindupDur = 0.16f * S;
+		ReturnFrom = CoinPivot->GetComponentLocation();
+		HandCoin = EHandCoin::Returning;
+	}
 	LandOffset = bLandInPlace ? FVector::ZeroVector : FVector(FMath::FRandRange(-4.f, 4.f), FMath::FRandRange(-4.f, 4.f), 0.f);
 
 	// El animasyonu (varsa)
@@ -215,6 +247,36 @@ void AFortuneCoinFlipper::Tick(float DeltaSeconds)
 	if (!bIsFlipping)
 	{
 		// AutoFlip: coin indikten kisa sure sonra kendiliginden at
+		// El varsa: sonuc gorunduktan sonra coin ele doner ve elde bekler
+		if (Hand)
+		{
+			if (HandCoin == EHandCoin::OnTable)
+			{
+				HandTimer -= DeltaSeconds;
+				if (HandTimer <= 0.f)
+				{
+					HandCoin = EHandCoin::Returning;
+					HandTimer = 0.f;
+					ReturnFrom = CoinPivot->GetComponentLocation();
+				}
+			}
+			else if (HandCoin == EHandCoin::Returning)
+			{
+				HandTimer += DeltaSeconds;
+				const float T = FMath::Clamp(HandTimer / 0.25f, 0.f, 1.f);
+				const float E = T * T * (3.f - 2.f * T);
+				const FVector P = FMath::Lerp(ReturnFrom, Hand->GetCoinPoint(), E) + FVector(0.f, 0.f, FMath::Sin(T * PI) * 6.f);
+				CoinPivot->SetWorldLocationAndRotation(P, FaceQuat(bRestIsHeads));
+				if (T >= 1.f) HandCoin = EHandCoin::InHand;
+				return;
+			}
+			else
+			{
+				PlaceCoinInHand();
+			}
+			if (HandCoin != EHandCoin::InHand) return;   // AutoFlip coin elde olunca
+		}
+
 		const UFortuneSubsystem* F = GetFortune();
 		if (F && F->IsAutoFlipEnabled())
 		{
@@ -230,6 +292,32 @@ void AFortuneCoinFlipper::Tick(float DeltaSeconds)
 	if (Delay > 0.f)
 	{
 		Delay -= DeltaSeconds;
+		return;
+	}
+
+	// El: once coin ele doner, sonra basparmak gerilir
+	if (Hand && PreTime < ReturnDur + WindupDur)
+	{
+		PreTime += DeltaSeconds;
+		if (PreTime < ReturnDur)
+		{
+			const float T = PreTime / FMath::Max(0.01f, ReturnDur);
+			const float E = T * T * (3.f - 2.f * T);
+			const FVector P = FMath::Lerp(ReturnFrom, Hand->GetCoinPoint(), E) + FVector(0.f, 0.f, FMath::Sin(T * PI) * 5.f);
+			CoinPivot->SetWorldLocationAndRotation(P, FaceQuat(bRestIsHeads));
+			Hand->SetPose(0.f, 0.f);
+		}
+		else
+		{
+			const float W = FMath::Clamp((PreTime - ReturnDur) / FMath::Max(0.01f, WindupDur), 0.f, 1.f);
+			Hand->SetPose(W, 0.f);
+			PlaceCoinInHand();
+		}
+		if (PreTime >= ReturnDur + WindupDur)
+		{
+			TossStart = Hand->GetCoinPoint();
+			HandCoin = EHandCoin::OnTable;
+		}
 		return;
 	}
 
@@ -249,10 +337,24 @@ void AFortuneCoinFlipper::Tick(float DeltaSeconds)
 	const float Roll = FMath::Lerp(StartRoll, EndRoll, Ease);
 	const float Yaw = Tier.YawSpins * 360.f * Ease;
 
-	FTransform X = RestTransform;
-	X.AddToTranslation(FVector(0.f, 0.f, Height) + LandOffset * T);
-	X.SetRotation((RestTransform.GetRotation() * FRotator(0.f, Yaw, Roll).Quaternion()));
-	CoinPivot->SetRelativeTransform(X);
+	if (Hand)
+	{
+		// Fiske: basparmak hizla firlar, sonra yavasca geri gelir
+		const float Flick = (T < 0.08f) ? T / 0.08f : FMath::Max(0.f, 1.f - (T - 0.08f) / 0.35f);
+		Hand->SetPose(0.f, Flick);
+
+		const FTransform RW = RestWorld();
+		const FVector End = RW.GetLocation() + GetActorTransform().TransformVector(LandOffset);
+		const FVector P = FMath::Lerp(TossStart, End, T) + FVector(0.f, 0.f, Height);
+		CoinPivot->SetWorldLocationAndRotation(P, RW.GetRotation() * FRotator(0.f, Yaw, Roll).Quaternion());
+	}
+	else
+	{
+		FTransform X = RestTransform;
+		X.AddToTranslation(FVector(0.f, 0.f, Height) + LandOffset * T);
+		X.SetRotation((RestTransform.GetRotation() * FRotator(0.f, Yaw, Roll).Quaternion()));
+		CoinPivot->SetRelativeTransform(X);
+	}
 
 	if (T >= 1.f)
 	{
@@ -265,6 +367,12 @@ void AFortuneCoinFlipper::Land()
 	bIsFlipping = false;
 	bRestIsHeads = Current.bHeads;
 	AutoTimer = GetDefault<UFortuneSettings>()->AutoFlipDelay;
+	if (Hand)
+	{
+		Hand->SetPose(0.f, 0.f);
+		HandCoin = EHandCoin::OnTable;
+		HandTimer = ShowResultTime;
+	}
 
 	// Son pozu temizle: yazi = duz, tura = ters
 	FTransform X = RestTransform;
@@ -317,6 +425,24 @@ void AFortuneCoinFlipper::Land()
 
 	// Seviye atladiysa gorunum degismis olabilir
 	RefreshCoinVisuals();
+}
+
+FTransform AFortuneCoinFlipper::RestWorld() const
+{
+	return RestTransform * GetActorTransform();
+}
+
+FQuat AFortuneCoinFlipper::FaceQuat(bool bHeads) const
+{
+	return RestWorld().GetRotation() * FRotator(0.f, 0.f, bHeads ? 0.f : 180.f).Quaternion();
+}
+
+void AFortuneCoinFlipper::PlaceCoinInHand()
+{
+	if (Hand)
+	{
+		CoinPivot->SetWorldLocationAndRotation(Hand->GetCoinPoint(), FaceQuat(bRestIsHeads));
+	}
 }
 
 void AFortuneCoinFlipper::PlayCriticalEffects()

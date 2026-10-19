@@ -4,6 +4,11 @@
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
+#include "FortuneSubsystem.h"
+#include "FortuneCoinData.h"
+#include "FortuneCoinShape.h"
+#include "ProceduralMeshComponent.h"
+#include "Engine/GameInstance.h"
 
 AFortuneCoinRain::AFortuneCoinRain()
 {
@@ -20,6 +25,39 @@ AFortuneCoinRain::AFortuneCoinRain()
 void AFortuneCoinRain::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Oyundaki coinler (yuz dokulu, sekilli): her yagan coin gercek bir coin modeli olur
+	if (const UGameInstance* GI = GetGameInstance())
+	{
+		if (UFortuneSubsystem* F = GI->GetSubsystem<UFortuneSubsystem>())
+		{
+			TArray<UFortuneCoinData*> Pool;
+			for (UFortuneCoinData* D : F->GetAllCoins())
+			{
+				if (D && D->HeadsTexture && !D->CoinMesh) Pool.Add(D);
+			}
+			if (Pool.Num() > 0)
+			{
+				const int32 N = FMath::Min(Count, 45);
+				Coins.SetNum(N);
+				for (int32 i = 0; i < N; ++i)
+				{
+					UProceduralMeshComponent* PMC = NewObject<UProceduralMeshComponent>(this);
+					PMC->SetupAttachment(GetRootComponent());
+					PMC->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+					PMC->SetCastShadow(false);
+					PMC->RegisterComponent();
+					// Her coin en az bir kez gorunsun, sonra rastgele
+					UFortuneCoinData* D = Pool[i < Pool.Num() ? i : FMath::RandRange(0, Pool.Num() - 1)];
+					FFortuneCoinShapeBuilder::BuildForCoin(PMC, D, true, false);
+					FCoin& C = Coins[i];
+					C.Shaped = ShapedCoins.Add(PMC);
+					Respawn(C, true);
+				}
+				return;
+			}
+		}
+	}
 
 	// Projedeki metal coin materyalleri (Python betigi olusturur); yoksa renkli duz materyal
 	struct FLook { const TCHAR* Path; FLinearColor Fallback; int32 Weight; };
@@ -80,6 +118,7 @@ void AFortuneCoinRain::Tick(float DeltaSeconds)
 	Time += DeltaSeconds;
 	const FVector Scale(CoinDiameter / 100.f, CoinDiameter / 100.f, CoinDiameter * 0.12f / 100.f);
 
+	const float ShapedScale = CoinDiameter / 6.f;   // BuildForCoin 6 cm cap
 	for (FCoin& C : Coins)
 	{
 		C.Pos.Z -= C.Speed * DeltaSeconds;
@@ -89,6 +128,11 @@ void AFortuneCoinRain::Tick(float DeltaSeconds)
 			Respawn(C, false);
 		}
 		const FVector P = C.Pos + FVector(0.f, FMath::Sin(Time * 1.3f + C.Phase) * C.Sway, 0.f);
+		if (ShapedCoins.IsValidIndex(C.Shaped))
+		{
+			ShapedCoins[C.Shaped]->SetRelativeTransform(FTransform(C.Rot, P, FVector(ShapedScale)));
+			continue;
+		}
 		Groups[C.Group]->UpdateInstanceTransform(C.Instance, FTransform(C.Rot, P, Scale), false, false, true);
 	}
 	for (UInstancedStaticMeshComponent* G : Groups)

@@ -33,6 +33,14 @@ public:
 	UFUNCTION(Exec)
 	void GiveScrolls(int32 Count = 5);
 
+	/** GiveCoin Skull  (isim parcasi; bos = tum coinler) */
+	UFUNCTION(Exec)
+	void GiveCoin(const FString& Name);
+
+	/** GiveAllCoins: tum coinleri ver */
+	UFUNCTION(Exec)
+	void GiveAllCoins();
+
 	/** GiveMoney 1000 */
 	UFUNCTION(Exec)
 	void GiveMoney(double Amount = 1000.0);

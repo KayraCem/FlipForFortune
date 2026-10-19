@@ -59,6 +59,9 @@ private:
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UProceduralMeshComponent> ShapedCoin;
 
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<class UFortuneCoinAuraComponent> CoinAura;
+
 	UPROPERTY()
 	TObjectPtr<UStaticMesh> DefaultCoinMesh;
 

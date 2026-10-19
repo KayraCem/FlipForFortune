@@ -129,6 +129,46 @@ def make_fx_glow_material():
 
 make_fx_glow_material()
 
+
+def make_fx_fire_material():
+    """Alev parcaciklari: isik ekleyen (additive), kenarlari yumusak, asla siyah gorunmez."""
+    path = f"{MAT_DIR}/M_FX_Fire"
+    if eal.does_asset_exist(path):
+        return unreal.load_asset(path)
+    mat = asset_tools.create_asset("M_FX_Fire", MAT_DIR, unreal.Material, unreal.MaterialFactoryNew())
+    mat.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+    mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_ADDITIVE)
+    mat.set_editor_property("used_with_instanced_static_meshes", True)
+    E = mel.create_material_expression
+    col = E(mat, unreal.MaterialExpressionVectorParameter, -800, 0)
+    col.set_editor_property("parameter_name", "Color")
+    col.set_editor_property("default_value", unreal.LinearColor(1.0, 0.4, 0.05, 1.0))
+    glow = E(mat, unreal.MaterialExpressionScalarParameter, -800, 200)
+    glow.set_editor_property("parameter_name", "Glow")
+    glow.set_editor_property("default_value", 3.0)
+    fres = E(mat, unreal.MaterialExpressionFresnel, -800, 350)
+    inv = E(mat, unreal.MaterialExpressionOneMinus, -600, 350)
+    mel.connect_material_expressions(fres, "", inv, "")
+    soft = E(mat, unreal.MaterialExpressionPower, -450, 350)
+    soft.set_editor_property("const_exponent", 2.0)
+    mel.connect_material_expressions(inv, "", soft, "Base")
+    m1 = E(mat, unreal.MaterialExpressionMultiply, -450, 100)
+    mel.connect_material_expressions(col, "", m1, "A")
+    mel.connect_material_expressions(glow, "", m1, "B")
+    m2 = E(mat, unreal.MaterialExpressionMultiply, -250, 200)
+    mel.connect_material_expressions(m1, "", m2, "A")
+    mel.connect_material_expressions(soft, "", m2, "B")
+    mel.connect_material_property(m2, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    mel.recompile_material(mat)
+    eal.save_loaded_asset(mat)
+    return mat
+
+
+try:
+    make_fx_fire_material()
+except Exception as _e:
+    unreal.log_warning(f"M_FX_Fire olusturulamadi: {_e}")
+
 M = {
     "gold": make_material("M_CoinGold", (1.0, 0.72, 0.25), 1.0, 0.25),
     "bronze": make_material("M_CoinBronze", (0.62, 0.36, 0.18), 1.0, 0.35),
@@ -244,8 +284,136 @@ def make_coin_face_material2():
     return mat
 
 
+def make_coin_face_material3():
+    """Neon coin materyali: M_CoinFace2 + FaceGlow (isik saçan doku) x GlowColor x GlowStrength, nabiz gibi atar."""
+    path = f"{MAT_DIR}/M_CoinFace3"
+    if eal.does_asset_exist(path):
+        return unreal.load_asset(path)
+    mat = asset_tools.create_asset("M_CoinFace3", MAT_DIR, unreal.Material, unreal.MaterialFactoryNew())
+    E = mel.create_material_expression
+    tex = E(mat, unreal.MaterialExpressionTextureSampleParameter2D, -900, 0)
+    tex.set_editor_property("parameter_name", "Face")
+    tex.set_editor_property("texture", unreal.load_asset("/Engine/EngineResources/WhiteSquareTexture"))
+    nrm = E(mat, unreal.MaterialExpressionTextureSampleParameter2D, -900, 700)
+    nrm.set_editor_property("parameter_name", "FaceNormal")
+    nrm.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL)
+    nrm.set_editor_property("texture", unreal.load_asset("/Engine/EngineMaterials/FlatNormal"))
+    mel.connect_material_property(nrm, "RGB", unreal.MaterialProperty.MP_NORMAL)
+    tint = E(mat, unreal.MaterialExpressionVectorParameter, -900, 250)
+    tint.set_editor_property("parameter_name", "Tint")
+    tint.set_editor_property("default_value", unreal.LinearColor(1, 1, 1, 1))
+    glow = E(mat, unreal.MaterialExpressionScalarParameter, -900, 400)
+    glow.set_editor_property("parameter_name", "Glow")
+    glow.set_editor_property("default_value", 0.0)
+    mul = E(mat, unreal.MaterialExpressionMultiply, -550, 100)
+    mel.connect_material_expressions(tex, "RGB", mul, "A")
+    mel.connect_material_expressions(tint, "", mul, "B")
+    mel.connect_material_property(mul, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    emi = E(mat, unreal.MaterialExpressionMultiply, -350, 300)
+    mel.connect_material_expressions(mul, "", emi, "A")
+    mel.connect_material_expressions(glow, "", emi, "B")
+    # Neon kismi
+    gtex = E(mat, unreal.MaterialExpressionTextureSampleParameter2D, -900, 950)
+    gtex.set_editor_property("parameter_name", "FaceGlow")
+    gtex.set_editor_property("texture", unreal.load_asset("/Engine/EngineResources/Black"))
+    gcol = E(mat, unreal.MaterialExpressionVectorParameter, -900, 1200)
+    gcol.set_editor_property("parameter_name", "GlowColor")
+    gcol.set_editor_property("default_value", unreal.LinearColor(1, 1, 1, 1))
+    gstr = E(mat, unreal.MaterialExpressionScalarParameter, -900, 1350)
+    gstr.set_editor_property("parameter_name", "GlowStrength")
+    gstr.set_editor_property("default_value", 0.0)
+    tim = E(mat, unreal.MaterialExpressionTime, -900, 1450)
+    tsp = E(mat, unreal.MaterialExpressionMultiply, -750, 1450)
+    tsp.set_editor_property("const_b", 0.7)
+    mel.connect_material_expressions(tim, "", tsp, "A")
+    sin = E(mat, unreal.MaterialExpressionSine, -600, 1450)
+    mel.connect_material_expressions(tsp, "", sin, "")
+    amp = E(mat, unreal.MaterialExpressionMultiply, -450, 1450)
+    amp.set_editor_property("const_b", 0.25)
+    mel.connect_material_expressions(sin, "", amp, "A")
+    pulse = E(mat, unreal.MaterialExpressionAdd, -300, 1450)
+    pulse.set_editor_property("const_b", 0.75)
+    mel.connect_material_expressions(amp, "", pulse, "A")
+    g1 = E(mat, unreal.MaterialExpressionMultiply, -600, 1050)
+    mel.connect_material_expressions(gtex, "RGB", g1, "A")
+    mel.connect_material_expressions(gcol, "", g1, "B")
+    g2 = E(mat, unreal.MaterialExpressionMultiply, -450, 1150)
+    mel.connect_material_expressions(g1, "", g2, "A")
+    mel.connect_material_expressions(gstr, "", g2, "B")
+    g3 = E(mat, unreal.MaterialExpressionMultiply, -300, 1150)
+    mel.connect_material_expressions(g2, "", g3, "A")
+    mel.connect_material_expressions(pulse, "", g3, "B")
+    tot = E(mat, unreal.MaterialExpressionAdd, -150, 500)
+    mel.connect_material_expressions(emi, "", tot, "A")
+    mel.connect_material_expressions(g3, "", tot, "B")
+    mel.connect_material_property(tot, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    met = E(mat, unreal.MaterialExpressionConstant, -550, 550)
+    met.set_editor_property("r", 0.9)
+    mel.connect_material_property(met, "", unreal.MaterialProperty.MP_METALLIC)
+    rough = E(mat, unreal.MaterialExpressionConstant, -550, 620)
+    rough.set_editor_property("r", 0.28)
+    mel.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    mel.recompile_material(mat)
+    eal.save_loaded_asset(mat)
+    return mat
+
+
+def make_aura_plain():
+    """Yaprak, diken, gul icin metal olmayan duz materyal (Color parametresi)."""
+    path = f"{MAT_DIR}/M_AuraPlain"
+    if eal.does_asset_exist(path):
+        return unreal.load_asset(path)
+    mat = asset_tools.create_asset("M_AuraPlain", MAT_DIR, unreal.Material, unreal.MaterialFactoryNew())
+    col = mel.create_material_expression(mat, unreal.MaterialExpressionVectorParameter, -500, 0)
+    col.set_editor_property("parameter_name", "Color")
+    col.set_editor_property("default_value", unreal.LinearColor(0.1, 0.4, 0.1, 1))
+    mel.connect_material_property(col, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    rough = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -500, 300)
+    rough.set_editor_property("r", 0.45)
+    mel.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    spec = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -500, 400)
+    spec.set_editor_property("r", 0.6)
+    mel.connect_material_property(spec, "", unreal.MaterialProperty.MP_SPECULAR)
+    mel.recompile_material(mat)
+    eal.save_loaded_asset(mat)
+    return mat
+
+
+def make_aura_metal():
+    """Coin zincirleri / kilitleri icin metal: Color parametresi."""
+    path = f"{MAT_DIR}/M_AuraMetal"
+    if eal.does_asset_exist(path):
+        return unreal.load_asset(path)
+    mat = asset_tools.create_asset("M_AuraMetal", MAT_DIR, unreal.Material, unreal.MaterialFactoryNew())
+    col = mel.create_material_expression(mat, unreal.MaterialExpressionVectorParameter, -500, 0)
+    col.set_editor_property("parameter_name", "Color")
+    col.set_editor_property("default_value", unreal.LinearColor(0.6, 0.6, 0.65, 1))
+    mel.connect_material_property(col, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    met = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -500, 200)
+    met.set_editor_property("r", 1.0)
+    mel.connect_material_property(met, "", unreal.MaterialProperty.MP_METALLIC)
+    rough = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -500, 300)
+    rough.set_editor_property("r", 0.3)
+    mel.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    mel.recompile_material(mat)
+    eal.save_loaded_asset(mat)
+    return mat
+
+
 make_coin_face_material()
 make_coin_face_material2()
+try:
+    make_coin_face_material3()
+except Exception as _e:
+    unreal.log_warning(f"M_CoinFace3 olusturulamadi: {_e}")
+try:
+    make_aura_plain()
+except Exception as _e:
+    unreal.log_warning(f"M_AuraPlain olusturulamadi: {_e}")
+try:
+    make_aura_metal()
+except Exception as _e:
+    unreal.log_warning(f"M_AuraMetal olusturulamadi: {_e}")
 
 # Menu coin yagmuru ve efektler instanced mesh kullanir: materyallere izin ver (yoksa beyaz gorunur)
 for _path in eal.list_assets(MAT_DIR, recursive=False):
@@ -337,21 +505,61 @@ COINS = [
      "Bulutların üstünde basılmış. Her kritik vuruşu kutsar."),
     ("DA_Coin_Galaxy", "Galaxy Coin", "CELESTIAL", 0.03, 800.0, 250.0, "BONUS_SCROLL_CHANCE", 3.0, "Enchant Scroll şansı x4.", "clover",
      "İçinde dönen minik bir galaksi var. Şans yıldızların arasında."),
+    ("DA_Coin_Seaweed", "Seaweed Coin", "RARE", 15, 9.0, 3.2, "FLAT_MONEY_BONUS", 3.0, "Her atışta +3 para.", "clover",
+     "Okyanusun dibinden çıkmış, hâlâ dalgalarla sallanıyor."),
+    ("DA_Coin_Zone", "Zone Coin", "EPIC", 5, 22.0, 8.5, "BONUS_CRIT_CHANCE", 0.08, "+%8 kritik şansı.", "clover",
+     "Tehlike bölgesi. Yaklaşan her atış kritik olabilir."),
+    ("DA_Coin_BlackRose", "Black Rose Coin", "LEGENDARY", 1.3, 45.0, 16.0, "BONUS_CRIT_MULTIPLY", 0.75, "Kritik çarpanı +0.75.", "phoenix",
+     "Dikenleri arasında kara bir gül. Güzel ama acıtır."),
+    ("DA_Coin_Lock", "Lock Coin", "LEGENDARY", 1.2, 42.0, 15.0, "MONEY_MULTIPLIER", 0.6, "Kazanç x1.6.", "gold",
+     "Zincirlerle kilitlenmiş bir hazine. Anahtarı sende."),
     ("DA_Coin_Skull", "Skull Coin", "SECRET", 0.005, 2500.0, 800.0, "MONEY_MULTIPLIER", 3.0, "Kazanç x4.", "phoenix",
      "Kimse nereden geldiğini bilmiyor. Sahibine servet, diğerlerine korku."),
 ]
 
 # Yeni coinlerin gorunusu: sekil, kenar rengi, seritteki renk, inis efekti
 STYLE = {
-    "Copper":   ("HEXAGON",   (0.7, 0.35, 0.18), (0.8, 0.42, 0.22), "DUST"),
-    "Star":     ("ROUND",     (0.45, 0.55, 0.85), (0.6, 0.7, 1.0), "SPARKS"),
-    "Ghost":    ("ROUND",     (0.55, 0.7, 0.95), (0.7, 0.85, 1.0), "SPARKS"),
-    "Gear":     ("GEAR",      (0.45, 0.48, 0.55), (0.65, 0.68, 0.74), "SPARKS"),
-    "Pumpkin":  ("SCALLOPED", (0.45, 0.38, 0.15), (1.0, 0.55, 0.12), "LEAVES"),
+    # coin: (sekil, kenar rengi, ikon rengi, inis efekti)  -- her coin kendine ozgu sekil
+    "Bronze":   ("ROUND",     (0.55, 0.3, 0.12),  (0.85, 0.55, 0.3), "DUST"),
+    "Copper":   ("HEXAGON",   (0.7, 0.35, 0.18),  (0.8, 0.42, 0.22), "DUST"),
+    "Silver":   ("OCTAGON",   (0.7, 0.72, 0.78),  (0.85, 0.86, 0.9), "SPARKS"),
+    "Star":     ("STAR",      (0.85, 0.6, 0.15),  (1.0, 0.8, 0.3), "SPARKS"),
+    "Gold":     ("DODECAGON", (0.9, 0.65, 0.18),  (1.0, 0.75, 0.3), "GOLD_RING"),
+    "Ghost":    ("GHOST",     (0.7, 0.82, 0.95),  (0.8, 0.9, 1.0), "SPARKS"),
+    "Gear":     ("GEAR_RING", (0.45, 0.42, 0.25), (0.55, 0.52, 0.32), "SPARKS"),
+    "Seaweed":  ("ROUND",     (0.12, 0.45, 0.42), (0.25, 0.9, 0.75), "LEAVES"),
+    "Clover":   ("CLOVER",    (0.15, 0.45, 0.2),  (0.2, 0.75, 0.35), "LEAVES"),
+    "Pumpkin":  ("PUMPKIN",   (0.7, 0.32, 0.06),  (1.0, 0.55, 0.12), "LEAVES"),
+    "Zone":     ("HEXAGON",   (0.25, 0.28, 0.12), (0.78, 1.0, 0.22), "SPARKS"),
+    "Phoenix":  ("GEAR",      (0.3, 0.1, 0.05),   (1.0, 0.35, 0.08), "FLAME"),
+    "BlackRose":("SCALLOPED", (0.12, 0.03, 0.04), (0.8, 0.1, 0.18), "FLAME"),
+    "Lock":     ("ROUND",     (0.75, 0.55, 0.18), (1.0, 0.8, 0.25), "GOLD_RING"),
     "Calendar": ("ROUND",     (0.75, 0.52, 0.12), (0.95, 0.72, 0.3), "GOLD_RING"),
     "Angel":    ("SCALLOPED", (0.95, 0.85, 0.55), (1.0, 0.97, 0.85), "GOLD_RING"),
-    "Galaxy":   ("DECAGON",   (0.25, 0.12, 0.5), (0.45, 0.3, 0.9), "SPARKS"),
-    "Skull":    ("OCTAGON",   (0.18, 0.06, 0.15), (0.35, 0.15, 0.3), "FLAME"),
+    "Galaxy":   ("DECAGON",   (0.25, 0.12, 0.5),  (0.45, 0.3, 0.9), "SPARKS"),
+    "Skull":    ("SKULL",     (0.55, 0.48, 0.38),   (0.6, 0.3, 0.8), "FLAME"),
+}
+# Isik saçan kisimlar + coine ozel 3D efekt
+GLOW = {
+    # coin: (parlama gucu, aura, aura rengi)
+    "Bronze":   (3.5, "NONE",       (1.0, 0.6, 0.3)),
+    "Copper":   (3.5, "BOLTS",      (1.0, 0.48, 0.25)),
+    "Silver":   (3.5, "COMPASS",    (0.8, 0.88, 1.0)),
+    "Star":     (4.0, "SPARKLE",    (1.0, 0.85, 0.4)),
+    "Gold":     (3.5, "SPARKLE",    (1.0, 0.78, 0.25)),
+    "Ghost":    (5.0, "SPARKLE",    (0.3, 0.95, 1.0)),
+    "Gear":     (3.5, "NONE",       (1.0, 0.7, 0.2)),
+    "Seaweed":  (4.0, "KELP",       (0.4, 1.0, 0.85)),
+    "Clover":   (3.5, "SPARKLE",    (0.45, 1.0, 0.5)),
+    "Pumpkin":  (6.0, "STEM",       (1.0, 0.55, 0.12)),
+    "Zone":     (5.0, "ZONE",       (0.78, 1.0, 0.22)),
+    "Phoenix":  (5.0, "FIRE",       (1.0, 0.32, 0.05)),
+    "BlackRose":(4.5, "THORNS",     (1.0, 0.12, 0.2)),
+    "Lock":     (4.5, "VAULT",      (1.0, 0.8, 0.25)),
+    "Calendar": (3.5, "CLOCK_HANDS",(1.0, 0.8, 0.35)),
+    "Angel":    (4.0, "WINGS",      (1.0, 0.9, 0.5)),
+    "Galaxy":   (5.0, "ORBIT",      (0.55, 0.65, 1.0)),
+    "Skull":    (6.0, "BONES",      (0.75, 0.25, 1.0)),
 }
 if not eal.does_directory_exist(COIN_DIR):
     eal.make_directory(COIN_DIR)
@@ -394,6 +602,20 @@ for cid, name, rarity, weight, base, per, ptype, pval, ptext, mat, desc in COINS
             n = import_normal(f"Art/Coins/T_Coin_{coin_key}_{side}_N.png", COIN_DIR + "/Textures", f"T_Coin_{coin_key}_{side}_N")
             if n:
                 da.set_editor_property("heads_normal" if side == "Heads" else "tails_normal", n)
+        # Neon parlama + tema efekti
+        gl = GLOW.get(coin_key)
+        if gl:
+            strength, aura, aura_col = gl
+            for side, prop in (("Heads", "heads_glow"), ("Tails", "tails_glow")):
+                g = import_texture(f"Art/Coins/T_Coin_{coin_key}_{side}_G.png", COIN_DIR + "/Textures", f"T_Coin_{coin_key}_{side}_G")
+                if g:
+                    da.set_editor_property(prop, g)
+            da.set_editor_property("glow_color", unreal.LinearColor(1, 1, 1, 1))
+            da.set_editor_property("glow_strength", float(strength))
+            av = enum_value(unreal.FortuneCoinAura, aura)
+            if av is not None:
+                da.set_editor_property("aura", av)
+            da.set_editor_property("aura_color", unreal.LinearColor(aura_col[0], aura_col[1], aura_col[2], 1.0))
         rim = {"Bronze": (0.55, 0.3, 0.12), "Silver": (0.7, 0.72, 0.78), "Gold": (0.95, 0.65, 0.15),
                "Clover": (0.75, 0.65, 0.3), "Phoenix": (0.8, 0.3, 0.08)}.get(coin_key, (0.75, 0.5, 0.15))
         if coin_key in STYLE:
@@ -420,6 +642,38 @@ flipper.set_actor_label("CoinFlipper")
 flipper.set_folder_path("Gameplay")
 flipper.get_editor_property("coin_mesh").set_material(0, M["bronze"])
 interactable("Click_Coin", unreal.FortuneInteraction.FLIP_COIN, "Coin At", (-25, 0, TABLE_Z + 3), (5, 5, 3))
+
+# El: coin'i fiskeyle atar (masanin on-sagi, kameraya yakin)
+try:
+    hand = actors.spawn_actor_from_class(unreal.FortuneHandActor, V(-50, 15, TABLE_Z + 7.5), R(yaw=-18))
+    hand.set_actor_label("Hand")
+    hand.set_folder_path("Gameplay")
+    hand.set_actor_scale3d(V(1.5, 1.5, 1.5))
+    flipper.set_editor_property("hand", hand)
+    # Projede mannequin kolu varsa (Add > Feature or Content Pack > First Person) onu kullan
+    try:
+        cands = []
+        for path in eal.list_assets("/Game", recursive=True, include_folder=False):
+            base = path.split("/")[-1].split(".")[0]
+            low = base.lower()
+            if low.startswith(("skm_", "sk_")) and any(k in low for k in ("arms", "manny", "quinn", "mannequin")):
+                score = 0 if "arms" in low else (1 if "manny" in low else 2)
+                cands.append((score, path))
+        cands.sort()
+        for _, path in cands:
+            m = unreal.load_asset(path)
+            if isinstance(m, unreal.SkeletalMesh):
+                hand.set_editor_property("hand_mesh", m)
+                unreal.log(f"El modeli: {path}")
+                break
+        else:
+            unreal.log_warning("Mannequin kolu bulunamadi: kodla kurulan el kullaniliyor (First Person paketini ekle).")
+    except Exception as e:
+        unreal.log_warning(f"El modeli ayarlanamadi: {e}")
+    # Elin uzerindeki coine tiklayinca da atilsin
+    interactable("Click_HandCoin", unreal.FortuneInteraction.FLIP_COIN, "Coin At", (-41, 10, TABLE_Z + 11), (8, 8, 6))
+except Exception as e:
+    unreal.log_warning("El eklenemedi (projeyi derledin mi?): " + str(e))
 
 # ---------------------------------------------------------------- 3) Sandik = ENVANTER (sol)
 cx, cy = 22.0, -26.0

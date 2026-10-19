@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Components/Button.h"
 #include "FortuneGachaWidgets.generated.h"
 
 class UTextBlock;
@@ -32,7 +33,26 @@ private:
 	UPROPERTY() TObjectPtr<UTextBlock> CostText;
 };
 
-/** Sandiga tiklayinca acilan panel: tum coinlerin nadirlik ve sanslari + SUMMON butonu. */
+class UFortuneSummonWidget;
+
+/** Kac kez summon yapacagini bilen buton (x1 / x5 / x10). */
+UCLASS()
+class MYPROJECT_API UFortuneSummonCountButton : public UButton
+{
+	GENERATED_BODY()
+
+public:
+	void Setup(UFortuneSummonWidget* InOwner, int32 InCount);
+	int32 Count = 1;
+
+private:
+	UFUNCTION()
+	void HandleClicked();
+
+	TWeakObjectPtr<UFortuneSummonWidget> Owner;
+};
+
+/** Sandiga tiklayinca acilan panel: tum coinlerin nadirlik ve sanslari + SUMMON x1 / x5 / x10 butonlari. */
 UCLASS()
 class MYPROJECT_API UFortuneSummonWidget : public UUserWidget
 {
@@ -41,24 +61,73 @@ class MYPROJECT_API UFortuneSummonWidget : public UUserWidget
 public:
 	TWeakObjectPtr<AFortuneGachaChest> Chest;
 
+	void Summon(int32 Count);
+
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
 	void BuildTree();
 	void Refresh();
+	void RebuildList();
 
-	UFUNCTION() void OnSummonClicked();
 	UFUNCTION() void OnCloseClicked();
 	UFUNCTION() void HandleMoneyChanged(double NewMoney);
+	UFUNCTION() void HandleCoinsChanged();
 
 	UPROPERTY() TObjectPtr<UVerticalBox> List;
+	UPROPERTY() TObjectPtr<class UHorizontalBox> DistRow;
 	UPROPERTY() TObjectPtr<UTextBlock> MoneyText;
-	UPROPERTY() TObjectPtr<UTextBlock> SummonText;
 	UPROPERTY() TObjectPtr<UTextBlock> LuckText;
-	UPROPERTY() TObjectPtr<UButton> SummonButton;
+	UPROPERTY() TObjectPtr<UTextBlock> CollectionText;
+	UPROPERTY() TObjectPtr<class UWidget> PanelRoot;
+	UPROPERTY() TObjectPtr<class UHorizontalBoxSlot> CollFill;
+	UPROPERTY() TObjectPtr<class UHorizontalBoxSlot> CollRest;
+	UPROPERTY() TObjectPtr<class UBorder> CollFillBorder;
+
+	// x1 / x5 / x10 butonlari
+	UPROPERTY() TArray<TObjectPtr<UFortuneSummonCountButton>> SummonButtons;
+	UPROPERTY() TArray<TObjectPtr<UTextBlock>> SummonCosts;
+	UPROPERTY() TArray<TObjectPtr<class UWidget>> SummonBoxes;
+
+	float Age = 0.f;
+	TArray<bool> Affordable;
+};
+
+/** Coklu summon sonucu: her coinin altinda isim/nadirlik etiketi, en iyisi vurgulu. Tikla -> kapat. */
+UCLASS()
+class MYPROJECT_API UFortuneGachaMultiRevealWidget : public UUserWidget
+{
+	GENERATED_BODY()
+
+public:
+	void Setup(AFortuneGachaChest* InChest, const TArray<UFortuneCoinData*>& Coins, const TArray<bool>& Duplicates,
+		const TArray<FVector>& WorldPositions, int32 BestIndex, int32 DuplicateXP);
+
+protected:
+	virtual TSharedRef<SWidget> RebuildWidget() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+
+private:
+	void BuildTree();
+	void TryClose();
+
+	UPROPERTY() TObjectPtr<class UCanvasPanel> Canvas;
+	UPROPERTY() TObjectPtr<UTextBlock> HeadlineText;
+	UPROPERTY() TObjectPtr<UTextBlock> SummaryText;
+	UPROPERTY() TObjectPtr<UTextBlock> HintText;
+	UPROPERTY() TArray<TObjectPtr<class UWidget>> Labels;
+
+	TArray<FVector> Positions;
+	TWeakObjectPtr<AFortuneGachaChest> Chest;
+	float Age = 0.f;
+	bool bClosed = false;
+	bool bPlaced = false;
 };
 
 UCLASS()

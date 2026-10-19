@@ -224,7 +224,7 @@ void AFortuneGachaChest::Interact()
 	OnInteracted();
 }
 
-bool AFortuneGachaChest::StartSummon()
+bool AFortuneGachaChest::StartSummon(int32 Count)
 {
 	if (State != EState::Idle) return false;
 
@@ -235,16 +235,40 @@ bool AFortuneGachaChest::StartSummon()
 	UFortuneSubsystem* F = GI ? GI->GetSubsystem<UFortuneSubsystem>() : nullptr;
 	if (!F) return false;
 
-	UFortuneCoinData* Coin = nullptr;
-	bool bDup = false;
-	if (!F->SummonCoin(Coin, bDup) || !Coin)
+	TArray<UFortuneCoinData*> Coins;
+	TArray<bool> Dups;
+	if (!F->SummonCoins(FMath::Max(1, Count), Coins, Dups) || Coins.Num() == 0)
 	{
 		return false;
 	}
 
-	WonCoin = Coin;
-	bWonDuplicate = bDup;
-	RarityColor = UFortuneSubsystem::GetRarityColor(Coin->Rarity);
+	// Nadirlige gore sirala: en iyisi en son cikar (ayni nadirlikte yeni coin tekrardan sonra)
+	TArray<int32> Order;
+	for (int32 i = 0; i < Coins.Num(); ++i) Order.Add(i);
+	Order.StableSort([&Coins, &Dups](int32 A, int32 B)
+	{
+		const uint8 RA = (uint8)Coins[A]->Rarity;
+		const uint8 RB = (uint8)Coins[B]->Rarity;
+		if (RA != RB) return RA < RB;
+		return Dups[A] && !Dups[B];
+	});
+	WonCoins.Reset();
+	WonDups.Reset();
+	for (int32 Idx : Order)
+	{
+		WonCoins.Add(Coins[Idx]);
+		WonDups.Add(Dups[Idx]);
+	}
+	BestIndex = WonCoins.Num() - 1;
+	bMulti = WonCoins.Num() > 1;
+	MultiCoins.Reset();
+	MultiSlots.Reset();
+	MultiLanded.Reset();
+	BurstTime = -1.f;
+
+	WonCoin = WonCoins[BestIndex];
+	bWonDuplicate = WonDups[BestIndex];
+	RarityColor = UFortuneSubsystem::GetRarityColor(WonCoin->Rarity);
 	if (FPC) FPC->SetMenuOpen(true);
 
 	State = EState::Shake;
@@ -271,13 +295,23 @@ void AFortuneGachaChest::Tick(float DeltaSeconds)
 	case EState::Shake:
 	{
 		// Sallanma: nadirlik ne kadar yuksekse o kadar guclu ve renkli
-		const float Strength = 0.6f + 0.25f * (float)(uint8)WonCoin->Rarity;
-		const float T = StateTime / 0.6f;
+		const float Dur = bMulti ? 1.1f : 0.6f;
+		const float Strength = (bMulti ? 0.9f : 0.6f) + 0.25f * (float)(uint8)WonCoin->Rarity;
+		const float T = FMath::Min(1.f, StateTime / Dur);
 		Body->SetRelativeLocation(BodyRestLoc + FVector(0.f, FMath::Sin(StateTime * 60.f) * Strength * (1.f - T * 0.5f), FMath::Abs(FMath::Sin(StateTime * 30.f)) * 0.6f));
 		SetLid(IdleLidAngle * (1.f - T) + FMath::Abs(FMath::Sin(StateTime * 45.f)) * 8.f);
-		InnerLight->SetLightColor(FMath::Lerp(FLinearColor(1.f, 0.75f, 0.35f), RarityColor, T));
-		InnerLight->SetIntensity(FMath::Lerp(250.f, 1500.f, T));
-		if (StateTime >= 0.6f)
+		if (bMulti && T < 0.8f)
+		{
+			// Coklu acilim: sandigin icinde cikacak coinlerin renkleri yanip soner
+			const int32 Idx = FMath::FloorToInt32(StateTime * 12.f) % WonCoins.Num();
+			InnerLight->SetLightColor(UFortuneSubsystem::GetRarityColor(WonCoins[Idx]->Rarity));
+		}
+		else
+		{
+			InnerLight->SetLightColor(FMath::Lerp(FLinearColor(1.f, 0.75f, 0.35f), RarityColor, T));
+		}
+		InnerLight->SetIntensity(FMath::Lerp(250.f, bMulti ? 2500.f : 1500.f, T));
+		if (StateTime >= Dur)
 		{
 			Body->SetRelativeLocation(BodyRestLoc);
 			State = EState::Open;
@@ -285,6 +319,11 @@ void AFortuneGachaChest::Tick(float DeltaSeconds)
 			if (OpenSound) UGameplayStatics::PlaySound2D(this, OpenSound);
 			AFortuneLandFXActor::SpawnAt(GetWorld(), Body->GetComponentLocation() + FVector(0.f, 0.f, ChestHeight + 2.f),
 				EFortuneLandFX::GoldRing, 1.f + 0.25f * (float)(uint8)WonCoin->Rarity, true);
+			if (bMulti)
+			{
+				AFortuneLandFXActor::SpawnAt(GetWorld(), Body->GetComponentLocation() + FVector(0.f, 0.f, ChestHeight + 2.f),
+					EFortuneLandFX::Sparks, 2.f, true);
+			}
 		}
 		break;
 	}
@@ -295,7 +334,15 @@ void AFortuneGachaChest::Tick(float DeltaSeconds)
 		SetLid(FMath::Lerp(0.f, 115.f, Ease));
 		InnerLight->SetIntensity(FMath::Lerp(1500.f, 6000.f, Ease));
 		InnerLight->SetAttenuationRadius(FMath::Lerp(45.f, 160.f, Ease));
-		if (T >= 1.f)
+		if (T >= 1.f && bMulti)
+		{
+			// Coklu acilim: coinler sirayla firlayip kameranin onunde izgaraya dizilir
+			MultiCoins.Init(nullptr, WonCoins.Num());
+			MultiLanded.Init(false, WonCoins.Num());
+			State = EState::Fly;
+			StateTime = 0.f;
+		}
+		else if (T >= 1.f)
 		{
 			// Coin sandiktan cikip kameraya ucacak
 			FActorSpawnParameters P;
@@ -312,6 +359,11 @@ void AFortuneGachaChest::Tick(float DeltaSeconds)
 	}
 	case EState::Fly:
 	{
+		if (bMulti)
+		{
+			TickMultiFly(DeltaSeconds, PC);
+			break;
+		}
 		const float T = FMath::Clamp(StateTime / 0.8f, 0.f, 1.f);
 		const float Ease = 1.f - FMath::Pow(1.f - T, 3.f);
 		InnerLight->SetIntensity(FMath::Lerp(6000.f, 1200.f, T));
@@ -378,23 +430,151 @@ void AFortuneGachaChest::FinishReveal()
 		FlyingCoin->Destroy();
 		FlyingCoin = nullptr;
 	}
+	for (AFortuneCoinPreview* P : MultiCoins)
+	{
+		if (P) P->Destroy();
+	}
+	MultiCoins.Reset();
+	bMulti = false;
 	RevealWidget = nullptr;
 	State = EState::Closing;
 	StateTime = 0.f;
 
-	// Coin Collection'i yeni coin secili olarak ac
+	// Summon bitince oyuna geri don (Coin Collection otomatik acilmaz)
 	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
 	if (AFortunePlayerController* FPC = Cast<AFortunePlayerController>(PC))
 	{
 		FPC->SetMenuOpen(false);
 	}
-	if (PC && WonCoin)
+}
+
+// ---------------- Coklu acilim ----------------
+
+float AFortuneGachaChest::MultiStartTime(int32 Index) const
+{
+	// Her coin bir oncekinden kisa sure sonra firlar; nadir (Epic+) en iyi coin icin dramatik bekleme
+	float T = Index * 0.13f;
+	if (Index == BestIndex && WonCoins.IsValidIndex(Index) && (uint8)WonCoins[Index]->Rarity >= (uint8)EFortuneRarity::Epic)
 	{
-		UFortuneCollectionWidget* Col = CreateWidget<UFortuneCollectionWidget>(PC, UFortuneCollectionWidget::StaticClass());
-		if (Col)
+		T += 0.55f;
+	}
+	return T;
+}
+
+void AFortuneGachaChest::TickMultiFly(float DeltaSeconds, APlayerController* PC)
+{
+	if (!PC || !PC->PlayerCameraManager) return;
+	const FVector CamLoc = PC->PlayerCameraManager->GetCameraLocation();
+	const FRotator CamRot = PC->PlayerCameraManager->GetCameraRotation();
+	const FRotationMatrix CamM(CamRot);
+	const FVector Fwd = CamM.GetUnitAxis(EAxis::X);
+	const FVector Right = CamM.GetUnitAxis(EAxis::Y);
+	const FVector Up = CamM.GetUnitAxis(EAxis::Z);
+	const int32 N = WonCoins.Num();
+	const int32 Cols = FMath::Min(N, 5);
+	const int32 Rows = FMath::DivideAndRoundUp(N, 5);
+	const float Dist = 48.f;
+	const float Spacing = 9.5f;
+	const float RowGap = 11.f;
+
+	// Izgara yerleri (kameraya gore)
+	MultiSlots.SetNum(N);
+	for (int32 i = 0; i < N; ++i)
+	{
+		const int32 R = i / 5;
+		const int32 InRow = (R == Rows - 1) ? (N - R * 5) : Cols;
+		const int32 C = i % 5;
+		const float X = (C - (InRow - 1) * 0.5f) * Spacing;
+		const float Y = ((Rows - 1) * 0.5f - R) * RowGap + 2.f;
+		MultiSlots[i] = CamLoc + Fwd * Dist + Right * X + Up * Y;
+	}
+
+	const FVector Start = Body->GetComponentLocation() + FVector(0.f, 0.f, ChestHeight + 4.f);
+	const float FlyDur = 0.7f;
+	bool bAllLanded = true;
+	float LastStart = 0.f;
+	for (int32 i = 0; i < N; ++i)
+	{
+		const float T0 = MultiStartTime(i);
+		LastStart = FMath::Max(LastStart, T0);
+		const float Local = (StateTime - T0) / FlyDur;
+		if (Local < 0.f)
 		{
-			Col->FocusCoinId = WonCoin->GetCoinId();
-			Col->AddToViewport(10);
+			bAllLanded = false;
+			continue;
+		}
+		const bool bBest = i == BestIndex;
+		const float Scale = bBest ? 1.2f : 1.f;
+		if (!MultiCoins[i])
+		{
+			FActorSpawnParameters P;
+			P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			MultiCoins[i] = GetWorld()->SpawnActor<AFortuneCoinPreview>(AFortuneCoinPreview::StaticClass(), FTransform(Start), P);
+			if (MultiCoins[i]) MultiCoins[i]->SetCoin(WonCoins[i], true, false);
+			InnerLight->SetLightColor(UFortuneSubsystem::GetRarityColor(WonCoins[i]->Rarity));
+			if (bBest && (uint8)WonCoins[i]->Rarity >= (uint8)EFortuneRarity::Epic)
+			{
+				// En iyi coin: isik patlamasi + alev/altin halka
+				BurstTime = StateTime;
+				const float Pow = 1.5f + 0.35f * (float)(uint8)WonCoins[i]->Rarity;
+				AFortuneLandFXActor::SpawnAt(GetWorld(), Start, EFortuneLandFX::GoldRing, Pow, true);
+				if ((uint8)WonCoins[i]->Rarity >= (uint8)EFortuneRarity::Legendary)
+				{
+					AFortuneLandFXActor::SpawnAt(GetWorld(), Start, EFortuneLandFX::Flame, Pow, true);
+				}
+				if (RevealSound) UGameplayStatics::PlaySound2D(this, RevealSound);
+			}
+			else if (OpenSound && i % 3 == 0)
+			{
+				UGameplayStatics::PlaySound2D(this, OpenSound, 0.5f, 1.3f);
+			}
+		}
+		if (!MultiCoins[i]) continue;
+		if (MultiLanded[i]) continue;
+
+		const float T = FMath::Clamp(Local, 0.f, 1.f);
+		const float Ease = 1.f - FMath::Pow(1.f - T, 3.f);
+		FVector Pos = FMath::Lerp(Start, MultiSlots[i], Ease);
+		Pos += Up * FMath::Sin(T * PI) * 14.f;
+		const float S = Scale * (FMath::Lerp(0.5f, 1.f, Ease) + 0.18f * FMath::Sin(T * PI));
+		MultiCoins[i]->PlaceAt(Pos, CamLoc, Up, S);
+		if (T >= 1.f)
+		{
+			MultiLanded[i] = true;
+		}
+		else
+		{
+			bAllLanded = false;
+		}
+	}
+
+	// Sandik isigi: her firlayista parlar, en iyi coinde patlar
+	float Intensity = 1800.f + 600.f * FMath::Sin(StateTime * 18.f);
+	if (BurstTime >= 0.f)
+	{
+		const float B = FMath::Clamp(1.f - (StateTime - BurstTime) / 0.7f, 0.f, 1.f);
+		Intensity += 9000.f * B;
+		if (B > 0.f) InnerLight->SetLightColor(RarityColor);
+	}
+	InnerLight->SetIntensity(Intensity);
+
+	if (bAllLanded && StateTime >= LastStart + FlyDur + 0.2f)
+	{
+		State = EState::Reveal;
+		StateTime = 0.f;
+		if (UFortuneGachaMultiRevealWidget* W = CreateWidget<UFortuneGachaMultiRevealWidget>(PC, UFortuneGachaMultiRevealWidget::StaticClass()))
+		{
+			TArray<UFortuneCoinData*> Coins;
+			TArray<FVector> LabelPos;
+			for (int32 i = 0; i < N; ++i)
+			{
+				Coins.Add(WonCoins[i]);
+				LabelPos.Add(MultiSlots[i] - Up * ((i == BestIndex) ? 4.6f : 3.9f));
+			}
+			W->AddToViewport(20);
+			W->Setup(this, Coins, WonDups, LabelPos, BestIndex, GetDefault<UFortuneSettings>()->DuplicateXP);
+			W->SetKeyboardFocus();
+			RevealWidget = W;
 		}
 	}
 }

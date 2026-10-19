@@ -641,6 +641,44 @@ bool UFortuneSubsystem::BuyUpgrade(EFortuneUpgradeType Upgrade)
 	return true;
 }
 
+double UFortuneSubsystem::GetUpgradeCostMulti(EFortuneUpgradeType Upgrade, int32 Count, int32& OutLevels) const
+{
+	OutLevels = 0;
+	const FFortuneUpgradeConfig C = GetUpgradeConfig(Upgrade);
+	const int32 L = GetUpgradeLevel(Upgrade);
+	if (L >= C.MaxLevel) return -1.0;
+	const float Discount = FMath::Min(GetEnchantBonus(EFortuneEnchantStat::UpgradeDiscount), GetDefault<UFortuneSettings>()->MaxDiscount);
+	const double Money = Save ? Save->Money : 0.0;
+	const int32 Room = C.MaxLevel - L;
+	const int32 Want = Count > 0 ? FMath::Min(Count, Room) : Room;
+
+	double Total = 0.0;
+	for (int32 i = 0; i < Want; ++i)
+	{
+		const double Step = FMath::FloorToDouble(C.BaseCost * FMath::Pow(C.CostGrowth, (double)(L + i)) * (1.0 - Discount) + 0.5);
+		if (Count <= 0 && i > 0 && Total + Step > Money) break;   // MAX: paranin yettigi yere kadar (en az 1)
+		Total += Step;
+		++OutLevels;
+		if (Count <= 0 && Total > Money) break;
+	}
+	return Total;
+}
+
+int32 UFortuneSubsystem::BuyUpgradeMulti(EFortuneUpgradeType Upgrade, int32 Count)
+{
+	if (!Save) return 0;
+	int32 Levels = 0;
+	const double Cost = GetUpgradeCostMulti(Upgrade, Count, Levels);
+	if (Cost < 0.0 || Levels <= 0 || Save->Money < Cost) return 0;
+	Save->Money -= Cost;
+	Save->UpgradeLevels.FindOrAdd(Upgrade) += Levels;
+	OnMoneyChanged.Broadcast(Save->Money);
+	OnUpgradesChanged.Broadcast();
+	OnCoinsChanged.Broadcast();
+	SaveProgress();
+	return Levels;
+}
+
 // ---------------- Gacha ----------------
 
 double UFortuneSubsystem::GetSummonCost() const
@@ -719,13 +757,9 @@ float UFortuneSubsystem::GetSummonChance(const UFortuneCoinData* Coin) const
 	return Total > 0.f ? Weight(Coin) / Total : 0.f;
 }
 
-bool UFortuneSubsystem::SummonCoin(UFortuneCoinData*& OutCoin, bool& bOutDuplicate)
+UFortuneCoinData* UFortuneSubsystem::RollSummonCoin() const
 {
-	OutCoin = nullptr;
-	bOutDuplicate = false;
-	const double Cost = GetSummonCost();
-	if (!Save || Save->Money < Cost || LoadedCoins.Num() == 0) return false;
-
+	if (LoadedCoins.Num() == 0) return nullptr;
 	// Luck nadir coinlerin agirligini artirir (nadirlik basamagi basina)
 	const float Luck = GetLuck();
 	auto Weight = [Luck](const UFortuneCoinData* C)
@@ -738,38 +772,85 @@ bool UFortuneSubsystem::SummonCoin(UFortuneCoinData*& OutCoin, bool& bOutDuplica
 	{
 		if (C) Total += Weight(C);
 	}
-	if (Total <= 0.f) return false;
+	if (Total <= 0.f) return nullptr;
 
 	float Roll = FMath::FRandRange(0.f, Total);
 	for (const TObjectPtr<UFortuneCoinData>& C : LoadedCoins)
 	{
 		if (!C) continue;
 		Roll -= Weight(C);
-		if (Roll <= 0.f)
-		{
-			OutCoin = C;
-			break;
-		}
+		if (Roll <= 0.f) return C;
 	}
-	if (!OutCoin)
+	return LoadedCoins.Last();
+}
+
+bool UFortuneSubsystem::GrantSummonedCoin(UFortuneCoinData* Coin)
+{
+	if (FFortuneOwnedCoin* Owned = FindOwned(Coin->GetCoinId()))
 	{
-		OutCoin = LoadedCoins.Last();
+		AddXP(*Owned, Coin, GetDefault<UFortuneSettings>()->DuplicateXP);
+		return true;
 	}
+	GiveCoin(Coin);
+	return false;
+}
+
+bool UFortuneSubsystem::SummonCoin(UFortuneCoinData*& OutCoin, bool& bOutDuplicate)
+{
+	TArray<UFortuneCoinData*> Coins;
+	TArray<bool> Dups;
+	OutCoin = nullptr;
+	bOutDuplicate = false;
+	if (!SummonCoins(1, Coins, Dups) || Coins.Num() == 0) return false;
+	OutCoin = Coins[0];
+	bOutDuplicate = Dups[0];
+	return true;
+}
+
+int32 UFortuneSubsystem::DebugGiveCoins(const FString& Name)
+{
+	int32 Given = 0;
+	for (const TObjectPtr<UFortuneCoinData>& C : LoadedCoins)
+	{
+		if (!C) continue;
+		const bool bMatch = Name.IsEmpty() || C->GetName().Contains(Name) || C->DisplayName.ToString().Contains(Name);
+		if (bMatch && GiveCoin(C)) ++Given;
+	}
+	if (Given > 0)
+	{
+		OnCoinsChanged.Broadcast();
+		SaveProgress();
+	}
+	return Given;
+}
+
+double UFortuneSubsystem::GetMultiSummonCost(int32 Count) const
+{
+	const double One = GetSummonCost();
+	const int32 N = FMath::Max(1, Count);
+	return One * (N >= 10 ? N - 1 : N);
+}
+
+bool UFortuneSubsystem::SummonCoins(int32 Count, TArray<UFortuneCoinData*>& OutCoins, TArray<bool>& OutDuplicates)
+{
+	OutCoins.Reset();
+	OutDuplicates.Reset();
+	const int32 N = FMath::Clamp(Count, 1, 50);
+	const double Cost = GetMultiSummonCost(N);
+	if (!Save || Save->Money < Cost || LoadedCoins.Num() == 0) return false;
 
 	Save->Money -= Cost;
-	if (FFortuneOwnedCoin* Owned = FindOwned(OutCoin->GetCoinId()))
+	for (int32 i = 0; i < N; ++i)
 	{
-		bOutDuplicate = true;
-		AddXP(*Owned, OutCoin, GetDefault<UFortuneSettings>()->DuplicateXP);
+		UFortuneCoinData* Coin = RollSummonCoin();
+		if (!Coin) continue;
+		const bool bDup = GrantSummonedCoin(Coin);
+		OutCoins.Add(Coin);
+		OutDuplicates.Add(bDup);
+		OnCoinSummoned.Broadcast(Coin, bDup);
 	}
-	else
-	{
-		GiveCoin(OutCoin);
-	}
-
 	OnMoneyChanged.Broadcast(Save->Money);
 	OnCoinsChanged.Broadcast();
-	OnCoinSummoned.Broadcast(OutCoin, bOutDuplicate);
 	SaveProgress();
-	return true;
+	return OutCoins.Num() > 0;
 }

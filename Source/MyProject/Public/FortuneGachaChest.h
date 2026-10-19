@@ -32,8 +32,8 @@ public:
 	/** "YENI!" ekrani kapaninca cagrilir. */
 	void FinishReveal();
 
-	/** Summon panelindeki SUMMON butonu: para harcar ve acilis animasyonunu baslatir. false = yetersiz para. */
-	bool StartSummon();
+	/** Summon panelindeki SUMMON butonu: para harcar ve acilis animasyonunu baslatir (Count > 1: coklu acilim). false = yetersiz para. */
+	bool StartSummon(int32 Count = 1);
 
 	bool IsBusy() const { return State != EState::Idle; }
 
@@ -102,6 +102,23 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UFortuneCoinData> WonCoin;
+
+	/** Coklu acilim: cikan coinler (nadirlige gore siralı, en iyisi en sonda), ekrandaki yerleri. */
+	UPROPERTY()
+	TArray<TObjectPtr<UFortuneCoinData>> WonCoins;
+
+	UPROPERTY()
+	TArray<TObjectPtr<AFortuneCoinPreview>> MultiCoins;
+
+	TArray<bool> WonDups;
+	TArray<FVector> MultiSlots;
+	TArray<bool> MultiLanded;
+	bool bMulti = false;
+	int32 BestIndex = 0;
+	float BurstTime = -1.f;
+
+	void TickMultiFly(float DeltaSeconds, APlayerController* PC);
+	float MultiStartTime(int32 Index) const;
 
 	EState State = EState::Idle;
 	float StateTime = 0.f;

@@ -45,19 +45,29 @@ protected:
 private:
 	void BuildTree();
 	void Refresh();
+	void SetBuyMode(int32 Mode);
 	UFortuneSubsystem* GetFortune() const;
 
 	UFUNCTION() void OnCloseClicked();
+	UFUNCTION() void OnModeX1();
+	UFUNCTION() void OnModeX10();
+	UFUNCTION() void OnModeMax();
 	UFUNCTION() void HandleChanged();
 	UFUNCTION() void HandleMoneyChanged(double NewMoney);
 
 	struct FRow
 	{
 		EFortuneUpgradeType Type;
+		FLinearColor Color;
+		TObjectPtr<class UBorder> RowBorder;
 		TObjectPtr<UTextBlock> Level;
 		TObjectPtr<UTextBlock> Value;
 		TObjectPtr<UTextBlock> Cost;
+		TObjectPtr<UTextBlock> CostSub;
 		TObjectPtr<UFortuneUpgradeBuyButton> Button;
+		TObjectPtr<class UHorizontalBoxSlot> BarFill;
+		TObjectPtr<class UHorizontalBoxSlot> BarRest;
+		TObjectPtr<class UBorder> BarFillBorder;
 		float Flash = 0.f;
 	};
 	TArray<FRow> Rows;
@@ -66,5 +76,12 @@ private:
 	UPROPERTY() TArray<TObjectPtr<UObject>> KeepAlive;
 
 	UPROPERTY() TObjectPtr<UTextBlock> MoneyText;
-	UPROPERTY() TObjectPtr<UTextBlock> StatsText;
+	UPROPERTY() TArray<TObjectPtr<UTextBlock>> StatChips;
+	UPROPERTY() TArray<TObjectPtr<UButton>> ModeButtons;
+	UPROPERTY() TObjectPtr<UWidget> PanelRoot;
+
+	/** 0 = x1, 1 = x10, 2 = MAKS */
+	int32 BuyMode = 0;
+	float Age = 0.f;
+	float MoneyPop = 0.f;
 };

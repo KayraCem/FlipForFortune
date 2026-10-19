@@ -32,6 +32,8 @@ private:
 	UPROPERTY() TObjectPtr<UImage> Logo;
 	UPROPERTY() TObjectPtr<UTextBlock> FallbackTitle;
 	UPROPERTY() TObjectPtr<UTextBlock> MoneyText;
+	UPROPERTY() TObjectPtr<class UWidget> PlayButtonBox;
+	UPROPERTY() TObjectPtr<class UTexture2D> GradientTexture;
 
 	float Age = 0.f;
 	float FadeOut = -1.f;
@@ -87,6 +89,27 @@ private:
 	UPROPERTY() TArray<TObjectPtr<UTextBlock>> ChanceTexts;
 	UPROPERTY() TObjectPtr<UButton> RollButton;
 	UPROPERTY() TObjectPtr<UTextBlock> RollText;
+
+	// Sol kart: coin simgesi, seviye
+	UPROPERTY() TObjectPtr<UImage> CoinIcon;
+	UPROPERTY() TObjectPtr<UTextBlock> CoinLetter;
+	UPROPERTY() TObjectPtr<UTextBlock> CoinInfoText;
+	UPROPERTY() TObjectPtr<UTextBlock> CurrentDesc;
+	UPROPERTY() TObjectPtr<class UWidget> PanelRoot;
+	UPROPERTY() TObjectPtr<class UWidget> RollBox;
+
+	// Tier sans cubuklari
+	UPROPERTY() TArray<TObjectPtr<class UHorizontalBoxSlot>> TierFill;
+	UPROPERTY() TArray<TObjectPtr<class UHorizontalBoxSlot>> TierRest;
+	UPROPERTY() TArray<TObjectPtr<UBorder>> TierFillBorder;
+
+	// Olasi enchant tablosu (satir arka planlari, sonuc gelince vurgulanir)
+	UPROPERTY() TArray<TObjectPtr<UBorder>> StatRows;
+	TArray<EFortuneEnchantStat> StatRowStats;
+	int32 HighlightRow = INDEX_NONE;
+	int32 HighlightTier = 1;
+	float HighlightTime = 0.f;
+	float Age = 0.f;
 
 	bool bRolling = false;
 	float RollTime = 0.f;

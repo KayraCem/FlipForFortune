@@ -45,6 +45,7 @@ private:
 		FRotator Spin = FRotator::ZeroRotator;
 		float Sway = 0.f;
 		float Phase = 0.f;
+		int32 Shaped = INDEX_NONE;   // oyundaki gercek coin modeli (ShapedCoins dizisinde)
 	};
 
 	void Respawn(FCoin& C, bool bAnywhere);
@@ -54,6 +55,10 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UStaticMesh> CoinMesh;
+
+	/** Oyundaki coinlerin sekilli/dokulu modelleri (her yagan coin icin bir tane). */
+	UPROPERTY()
+	TArray<TObjectPtr<class UProceduralMeshComponent>> ShapedCoins;
 
 	UPROPERTY()
 	TObjectPtr<UMaterialInterface> ShapeMaterial;

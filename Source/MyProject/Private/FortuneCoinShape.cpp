@@ -26,6 +26,69 @@ namespace
 		case EFortuneCoinShape::Octagon:  Poly(8, PI / 8.f); break;
 		case EFortuneCoinShape::Hexagon:  Poly(6, 0.f); break;
 		case EFortuneCoinShape::Decagon:  Poly(10, 0.f); break;
+		case EFortuneCoinShape::Dodecagon: Poly(12, PI / 12.f); break;
+		case EFortuneCoinShape::Pumpkin:
+		case EFortuneCoinShape::Skull:
+		{
+			const int32 N = 200;
+			for (int32 i = 0; i < N; ++i)
+			{
+				const float A = 2.f * PI * i / N;   // 0 = ust (+X)
+				const float Ca = FMath::Cos(A), Sa = FMath::Sin(A);
+				float Rr;
+				if (Shape == EFortuneCoinShape::Pumpkin)
+				{
+					// genis elips + dilim tumsekleri + ustte sap cukuru
+					Rr = 1.f / FMath::Sqrt(FMath::Square(Ca / 0.84f) + FMath::Square(Sa / 1.f));
+					Rr *= 1.f - 0.05f * (1.f - FMath::Abs(FMath::Cos(5.f * A)));
+					const float D0 = A / 0.32f, D1 = (A - 2.f * PI) / 0.32f;
+					Rr *= 1.f - 0.13f * FMath::Exp(-D0 * D0) - 0.13f * FMath::Exp(-D1 * D1);
+				}
+				else
+				{
+					// kafatasi: dikey elips kafa, elmacik altinda iceri kivrim, duz cene
+					Rr = 1.f / FMath::Sqrt(FMath::Square(Ca / 1.f) + FMath::Square(Sa / 0.86f));
+					const float Ang = FMath::Abs(FMath::Atan2(Sa, Ca));   // 0..PI (ustten)
+					const float Notch = (Ang - 2.3f) / 0.2f;
+					Rr *= 1.f - 0.16f * FMath::Exp(-Notch * Notch);
+					if (Ca < -0.05f)
+					{
+						Rr = FMath::Min(Rr, 0.9f / -Ca);   // duz alt cene
+						if (Ang > 2.45f) Rr = FMath::Min(Rr, 0.62f / FMath::Max(FMath::Abs(Sa), 0.05f));   // dar cene
+					}
+				}
+				Out.Add(FVector2D(Ca, Sa) * R * Rr);
+			}
+			break;
+		}
+		case EFortuneCoinShape::Star:
+		case EFortuneCoinShape::Clover:
+		case EFortuneCoinShape::Ghost:
+		{
+			const int32 N = 160;
+			for (int32 i = 0; i < N; ++i)
+			{
+				const float A = 2.f * PI * i / N;
+				float Rr = R;
+				if (Shape == EFortuneCoinShape::Star)
+				{
+					// yuvarlak uclu 5 koseli yildiz, bir ucu yukari (+X)
+					Rr = R * (0.6f + 0.4f * FMath::Pow(FMath::Abs(FMath::Cos(2.5f * A)), 2.2f));
+				}
+				else if (Shape == EFortuneCoinShape::Clover)
+				{
+					Rr = R * (0.66f + 0.34f * FMath::Pow(FMath::Abs(FMath::Cos(2.f * (A - PI / 4.f))), 0.55f));
+				}
+				else
+				{
+					// ust (+X) yuvarlak, alt (-X) dalgali etek
+					const float Down = FMath::Max(0.f, -FMath::Cos(A) - 0.15f) / 0.85f;
+					Rr = R * (1.f - 0.13f * Down * (0.5f + 0.5f * FMath::Sin(A * 9.f)));
+				}
+				Out.Add(FVector2D(FMath::Cos(A), FMath::Sin(A)) * Rr);
+			}
+			break;
+		}
 		case EFortuneCoinShape::Scalloped:
 		{
 			const int32 N = 120;
@@ -38,14 +101,16 @@ namespace
 			break;
 		}
 		case EFortuneCoinShape::Gear:
+		case EFortuneCoinShape::GearRing:
 		{
 			bFlat = true;
-			const int32 Teeth = 14;
+			const int32 Teeth = Shape == EFortuneCoinShape::GearRing ? 8 : 14;
 			for (int32 t = 0; t < Teeth; ++t)
 			{
 				const float Base = 2.f * PI * t / Teeth;
 				const float Step = 2.f * PI / Teeth;
-				const float Pts[4][2] = { {0.f, 0.86f}, {0.18f, 1.f}, {0.5f, 1.f}, {0.68f, 0.86f} };
+				const float Lo = Shape == EFortuneCoinShape::GearRing ? 0.8f : 0.86f;
+				const float Pts[4][2] = { {0.f, Lo}, {0.14f, 1.f}, {0.42f, 1.f}, {0.56f, Lo} };
 				for (const auto& P : Pts)
 				{
 					const float A = Base + P[0] * Step;
@@ -79,6 +144,7 @@ void FFortuneCoinShapeBuilder::Build(UProceduralMeshComponent* PMC, EFortuneCoin
 	bool bFlat = false;
 	Outline(Shape, R, Pts, bFlat);
 	const int32 N = Pts.Num();
+	const float HoleR = (Shape == EFortuneCoinShape::GearRing) ? R * 0.3f : 0.f;
 
 	// Kenar disa dogru normaller (duz kenarli sekillerde kenar basina, yuvarlakta nokta basina)
 	auto EdgeNormal = [&](int32 i, int32 j) -> FVector2D
@@ -148,6 +214,29 @@ void FFortuneCoinShapeBuilder::Build(UProceduralMeshComponent* PMC, EFortuneCoin
 			}
 		}
 
+		// Delikli sekil: ic alan halka seridi (delige kadar)
+		if (HoleR > 0.f)
+		{
+			const FRing& L = Prof[NR - 1];
+			const int32 C0 = V.Num();
+			for (int32 i = 0; i < N; ++i)
+			{
+				const FVector Po(Pts[i] * L.F, Sgn * (H + L.Z));
+				const FVector Pi(Pts[i].GetSafeNormal() * HoleR, Sgn * (H + L.Z));
+				V.Add(Po); Nrm.Add(FVector(0.f, 0.f, Sgn)); UV.Add(UVof(Po, bTop)); Tan.Add(T);
+				V.Add(Pi); Nrm.Add(FVector(0.f, 0.f, Sgn)); UV.Add(UVof(Pi, bTop)); Tan.Add(T);
+			}
+			for (int32 i = 0; i < N; ++i)
+			{
+				const int32 j = (i + 1) % N;
+				const int32 O0 = C0 + 2 * i, I0 = O0 + 1, O1 = C0 + 2 * j, I1 = O1 + 1;
+				if (bTop) { Tri.Add(I0); Tri.Add(O1); Tri.Add(O0); Tri.Add(I0); Tri.Add(I1); Tri.Add(O1); }
+				else      { Tri.Add(I0); Tri.Add(O0); Tri.Add(O1); Tri.Add(I0); Tri.Add(O1); Tri.Add(I1); }
+			}
+			PMC->CreateMeshSection(Side, V, Tri, Nrm, UV, TArray<FColor>(), Tan, false);
+			continue;
+		}
+
 		// Cukur ic alan (merkezden yelpaze)
 		{
 			const FRing& L = Prof[NR - 1];
@@ -194,6 +283,26 @@ void FFortuneCoinShapeBuilder::Build(UProceduralMeshComponent* PMC, EFortuneCoin
 			Tri.Add(Base + 0); Tri.Add(Base + 2); Tri.Add(Base + 1);
 			Tri.Add(Base + 2); Tri.Add(Base + 3); Tri.Add(Base + 1);
 		}
+		// Delik ic duvari (iceri bakan)
+		if (HoleR > 0.f)
+		{
+			const float HD = H - Thickness * 0.14f;
+			const int32 M = 48;
+			for (int32 i = 0; i < M; ++i)
+			{
+				const float A0 = 2.f * PI * i / M, A1 = 2.f * PI * (i + 1) / M;
+				const FVector2D D0(FMath::Cos(A0), FMath::Sin(A0)), D1(FMath::Cos(A1), FMath::Sin(A1));
+				const int32 Base = V.Num();
+				V.Add(FVector(D0 * HoleR, HD)); V.Add(FVector(D0 * HoleR, -HD));
+				V.Add(FVector(D1 * HoleR, HD)); V.Add(FVector(D1 * HoleR, -HD));
+				Nrm.Add(FVector(-D0, 0.f)); Nrm.Add(FVector(-D0, 0.f)); Nrm.Add(FVector(-D1, 0.f)); Nrm.Add(FVector(-D1, 0.f));
+				UV.Add(FVector2D(i * 0.1f, 0.f)); UV.Add(FVector2D(i * 0.1f, 1.f)); UV.Add(FVector2D((i + 1) * 0.1f, 0.f)); UV.Add(FVector2D((i + 1) * 0.1f, 1.f));
+				for (int32 k = 0; k < 4; ++k) Tan.Add(FProcMeshTangent(FVector(-D0.Y, D0.X, 0.f), false));
+				// ic duvar: ters sarim
+				Tri.Add(Base + 0); Tri.Add(Base + 1); Tri.Add(Base + 2);
+				Tri.Add(Base + 2); Tri.Add(Base + 1); Tri.Add(Base + 3);
+			}
+		}
 		PMC->CreateMeshSection(2, V, Tri, Nrm, UV, TArray<FColor>(), Tan, false);
 	}
 }
@@ -206,7 +315,12 @@ bool FFortuneCoinShapeBuilder::BuildForCoin(UProceduralMeshComponent* PMC, const
 	Build(PMC, Coin->Shape, Diameter, Thickness);
 
 	// M_CoinFace: Face (doku) x Tint -> renk, Glow -> parlama (Python betigi olusturur)
-	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/FlipForFortune/Materials/M_CoinFace2.M_CoinFace2"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	// M_CoinFace3 = M_CoinFace2 + neon parlama dokusu (FaceGlow x GlowColor x GlowStrength, nabiz gibi atar)
+	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/FlipForFortune/Materials/M_CoinFace3.M_CoinFace3"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	if (!Base)
+	{
+		Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/FlipForFortune/Materials/M_CoinFace2.M_CoinFace2"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	}
 	if (!Base)
 	{
 		Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/FlipForFortune/Materials/M_CoinFace.M_CoinFace"), nullptr, LOAD_NoWarn | LOAD_Quiet);
@@ -221,21 +335,29 @@ bool FFortuneCoinShapeBuilder::BuildForCoin(UProceduralMeshComponent* PMC, const
 	const FLinearColor Tint = bOwned ? FLinearColor::White : FLinearColor(0.015f, 0.015f, 0.02f);
 	const float Glow = bOwned ? (bEnchanted ? 0.35f : 0.f) : 0.f;
 
-	auto Apply = [&](int32 Section, UTexture2D* Tex, const FLinearColor& Color, UTexture2D* NormalTex = nullptr)
+	UTexture2D* Black = LoadObject<UTexture2D>(nullptr, TEXT("/Engine/EngineResources/Black.Black"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+
+	auto Apply = [&](int32 Section, UTexture2D* Tex, const FLinearColor& Color, UTexture2D* NormalTex = nullptr, UTexture2D* GlowTex = nullptr)
 	{
 		if (UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Base, PMC))
 		{
 			if (Tex) MID->SetTextureParameterValue(TEXT("Face"), Tex);
 			if (NormalTex) MID->SetTextureParameterValue(TEXT("FaceNormal"), NormalTex);
+			const bool bGlow = GlowTex && bOwned && Coin->GlowStrength > 0.f;
+			if (bGlow) MID->SetTextureParameterValue(TEXT("FaceGlow"), GlowTex);
+			else if (Black) MID->SetTextureParameterValue(TEXT("FaceGlow"), Black);
+			MID->SetScalarParameterValue(TEXT("GlowStrength"), bGlow ? Coin->GlowStrength : 0.f);
+			MID->SetVectorParameterValue(TEXT("GlowColor"), Coin->GlowColor);
 			MID->SetVectorParameterValue(TEXT("Tint"), Color);
 			MID->SetVectorParameterValue(TEXT("Color"), Color);   // yedek materyal icin
 			MID->SetScalarParameterValue(TEXT("Glow"), Glow);
 			PMC->SetMaterial(Section, MID);
 		}
 	};
-	Apply(0, Coin->HeadsTexture, Tint, Coin->HeadsNormal);
+	Apply(0, Coin->HeadsTexture, Tint, Coin->HeadsNormal, Coin->HeadsGlow);
 	Apply(1, Coin->TailsTexture ? Coin->TailsTexture.Get() : Coin->HeadsTexture.Get(), Tint,
-		Coin->TailsNormal ? Coin->TailsNormal.Get() : Coin->HeadsNormal.Get());
+		Coin->TailsNormal ? Coin->TailsNormal.Get() : Coin->HeadsNormal.Get(),
+		Coin->TailsGlow ? Coin->TailsGlow.Get() : Coin->HeadsGlow.Get());
 	Apply(2, White, bOwned ? Coin->RimColor : Tint, RimN);
 	return true;
 }

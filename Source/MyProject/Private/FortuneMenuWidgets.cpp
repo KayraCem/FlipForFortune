@@ -17,8 +17,13 @@
 #include "Components/TextBlock.h"
 #include "Components/SizeBox.h"
 #include "Components/Spacer.h"
+#include "Components/Overlay.h"
+#include "Components/OverlaySlot.h"
+#include "Components/ScrollBox.h"
+#include "FortuneUIStyle.h"
 #include "Styling/SlateTypes.h"
 #include "Engine/Texture2D.h"
+#include "TextureResource.h"
 #include "Engine/GameInstance.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Framework/Application/SlateApplication.h"
@@ -97,17 +102,44 @@ void UFortuneMainMenuWidget::BuildTree()
 	UCanvasPanel* Root = T->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("Root"));
 	T->RootWidget = Root;
 
-	// Arkada oda gorunur ama karartilir
-	// Sag tarafta koyu panel (solda yagan coinler gorunsun)
-	UImage* Side = T->ConstructWidget<UImage>(UImage::StaticClass());
-	Side->SetColorAndOpacity(FLinearColor(0.02f, 0.01f, 0.01f, 0.55f));
-	UCanvasPanelSlot* SideSlot = Root->AddChildToCanvas(Side);
-	SideSlot->SetAnchors(FAnchors(0.52f, 0.f, 1.f, 1.f));
-	SideSlot->SetOffsets(FMargin(0.f));
+	using namespace FortuneStyle;
+	const FLinearColor Gold(1.f, 0.8f, 0.32f);
+
+	// Sag tarafa dogru yumusakca koyulasan gecis: tek parca degrade doku (serit/cizgi yok)
+	{
+		const int32 W = 256;
+		UTexture2D* Grad = UTexture2D::CreateTransient(W, 1, PF_B8G8R8A8);
+		if (Grad)
+		{
+			Grad->Filter = TF_Bilinear;
+			Grad->AddressX = TA_Clamp;
+			Grad->AddressY = TA_Clamp;
+			Grad->SRGB = false;
+			FTexture2DMipMap& Mip = Grad->GetPlatformData()->Mips[0];
+			FColor* Px = static_cast<FColor*>(Mip.BulkData.Lock(LOCK_READ_WRITE));
+			for (int32 x = 0; x < W; ++x)
+			{
+				const float T01 = FMath::Clamp((float)x / (W - 1) / 0.5f, 0.f, 1.f);   // ilk yarida yukselir
+				Px[x] = FColor(5, 2, 3, (uint8)FMath::RoundToInt32(158.f * FMath::SmoothStep(0.f, 1.f, T01)));
+			}
+			Mip.BulkData.Unlock();
+			Grad->UpdateResource();
+			GradientTexture = Grad;
+
+			UImage* Side = T->ConstructWidget<UImage>(UImage::StaticClass());
+			FSlateBrush GB;
+			GB.SetResourceObject(Grad);
+			GB.ImageSize = FVector2f(256.f, 1.f);
+			Side->SetBrush(GB);
+			UCanvasPanelSlot* SideSlot = Root->AddChildToCanvas(Side);
+			SideSlot->SetAnchors(FAnchors(0.32f, 0.f, 1.f, 1.f));
+			SideSlot->SetOffsets(FMargin(0.f));
+		}
+	}
 
 	UVerticalBox* Col = T->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	UCanvasPanelSlot* ColSlot = Root->AddChildToCanvas(Col);
-	ColSlot->SetAnchors(FAnchors(0.76f, 0.5f));
+	ColSlot->SetAnchors(FAnchors(0.77f, 0.5f));
 	ColSlot->SetAlignment(FVector2D(0.5f, 0.5f));
 	ColSlot->SetAutoSize(true);
 
@@ -118,32 +150,44 @@ void UFortuneMainMenuWidget::BuildTree()
 	{
 		FSlateBrush B;
 		B.SetResourceObject(Tex);
-		B.ImageSize = FVector2f(600.f, 450.f);
+		B.ImageSize = FVector2f(620.f, 465.f);
 		Logo->SetBrush(B);
-		Col->AddChildToVerticalBox(Sized(T, Logo, 600.f, 450.f))->SetHorizontalAlignment(HAlign_Center);
+		Logo->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+		Col->AddChildToVerticalBox(Sized(T, Logo, 620.f, 465.f))->SetHorizontalAlignment(HAlign_Center);
 	}
 	else
 	{
-		FallbackTitle = MenuText(T, TEXT("FLIP FOR FORTUNE"), 72, FLinearColor(1.f, 0.8f, 0.3f));
+		FallbackTitle = MenuText(T, TEXT("FLIP FOR FORTUNE"), 72, Gold);
 		Col->AddChildToVerticalBox(FallbackTitle)->SetHorizontalAlignment(HAlign_Center);
 	}
 
-	MoneyText = MenuText(T, TEXT(""), 20, FLinearColor(1.f, 1.f, 1.f, 0.7f), false);
-	UVerticalBoxSlot* MoneySlot = Col->AddChildToVerticalBox(MoneyText);
+	// Para + koleksiyon bilgisi: tek bir hap icinde
+	UBorder* Info = T->ConstructWidget<UBorder>(UBorder::StaticClass());
+	Info->SetBrush(StyRounded(FLinearColor(0.f, 0.f, 0.f, 0.45f), StyWithAlpha(Gold, 0.5f), 20.f, 1.5f));
+	Info->SetPadding(FMargin(22.f, 8.f));
+	MoneyText = MenuText(T, TEXT(""), 20, FLinearColor(1.f, 0.92f, 0.75f), true);
+	MoneyText->SetJustification(ETextJustify::Center);
+	Info->SetContent(MoneyText);
+	UVerticalBoxSlot* MoneySlot = Col->AddChildToVerticalBox(Info);
 	MoneySlot->SetHorizontalAlignment(HAlign_Center);
-	MoneySlot->SetPadding(FMargin(0.f, 0.f, 0.f, 18.f));
+	MoneySlot->SetPadding(FMargin(0.f, 0.f, 0.f, 22.f));
 
-	UButton* Play = MenuButton(T, MenuText(T, TEXT("OYNA"), 40, FLinearColor(1.f, 0.95f, 0.8f)), FLinearColor(0.55f, 0.32f, 0.05f, 1.f), FLinearColor(1.f, 0.85f, 0.4f), 22.f);
+	UButton* Play = StyButton(T, StyText(T, TEXT("OYNA"), 40, FLinearColor(1.f, 0.96f, 0.85f), true, 220),
+		FLinearColor(0.62f, 0.36f, 0.05f, 1.f), FLinearColor(1.f, 0.88f, 0.45f), 26.f);
 	Play->OnClicked.AddDynamic(this, &UFortuneMainMenuWidget::OnPlayClicked);
-	Col->AddChildToVerticalBox(Sized(T, Play, 360.f, 84.f))->SetHorizontalAlignment(HAlign_Center);
+	USizeBox* PlayBox = Sized(T, Play, 380.f, 88.f);
+	PlayBox->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+	PlayButtonBox = PlayBox;
+	Col->AddChildToVerticalBox(PlayBox)->SetHorizontalAlignment(HAlign_Center);
 
-	UButton* Quit = MenuButton(T, MenuText(T, TEXT("ÇIKIŞ"), 24, FLinearColor(1.f, 0.6f, 0.6f)), FLinearColor(0.2f, 0.05f, 0.05f, 0.9f), FLinearColor(1.f, 0.4f, 0.4f));
+	UButton* Quit = StyButton(T, StyText(T, TEXT("ÇIKIŞ"), 22, FLinearColor(1.f, 0.7f, 0.7f), true, 120),
+		FLinearColor(0.16f, 0.04f, 0.05f, 0.9f), FLinearColor(1.f, 0.45f, 0.45f), 18.f);
 	Quit->OnClicked.AddDynamic(this, &UFortuneMainMenuWidget::OnQuitClicked);
 	UVerticalBoxSlot* QuitSlot = Col->AddChildToVerticalBox(Sized(T, Quit, 240.f, 54.f));
 	QuitSlot->SetHorizontalAlignment(HAlign_Center);
-	QuitSlot->SetPadding(FMargin(0.f, 14.f, 0.f, 0.f));
+	QuitSlot->SetPadding(FMargin(0.f, 16.f, 0.f, 0.f));
 
-	UTextBlock* Version = MenuText(T, TEXT("v0.1"), 14, FLinearColor(1.f, 1.f, 1.f, 0.4f), false);
+	UTextBlock* Version = MenuText(T, TEXT("v0.2"), 14, FLinearColor(1.f, 1.f, 1.f, 0.4f), false);
 	UCanvasPanelSlot* VerSlot = Root->AddChildToCanvas(Version);
 	VerSlot->SetAnchors(FAnchors(1.f, 1.f));
 	VerSlot->SetAlignment(FVector2D(1.f, 1.f));
@@ -176,8 +220,15 @@ void UFortuneMainMenuWidget::NativeConstruct()
 	const UGameInstance* GI = GetGameInstance();
 	if (const UFortuneSubsystem* F = GI ? GI->GetSubsystem<UFortuneSubsystem>() : nullptr)
 	{
+		int32 Owned = 0, Total = 0;
+		for (const FFortuneCollectionEntry& E : F->GetCollection())
+		{
+			if (!E.Coin) continue;
+			++Total;
+			if (E.bOwned) ++Owned;
+		}
 		MoneyText->SetText(FText::FromString(F->GetMoney() > 0.0
-			? FString::Printf(TEXT("Paran: $ %s"), *UFortuneHUDWidget::FormatMoney(F->GetMoney()).ToString())
+			? FString::Printf(TEXT("$ %s     •     Koleksiyon %d/%d"), *UFortuneHUDWidget::FormatMoney(F->GetMoney()).ToString(), Owned, Total)
 			: FString(TEXT("Yazı mı, tura mı? Şansını dene!"))));
 	}
 }
@@ -195,6 +246,13 @@ void UFortuneMainMenuWidget::NativeTick(const FGeometry& MyGeometry, float InDel
 		const float S = (0.85f + 0.15f * (1.f - FMath::Pow(1.f - In, 3.f))) * (1.f + 0.015f * FMath::Sin(Age * 2.f));
 		Title->SetRenderScale(FVector2D(S, S));
 		Title->SetRenderTranslation(FVector2D(0.f, FMath::Sin(Age * 1.4f) * 6.f));
+	}
+
+	// OYNA butonu hafifce nabiz gibi atar
+	if (PlayButtonBox)
+	{
+		const float P = 1.f + 0.03f * (0.5f + 0.5f * FMath::Sin(Age * 3.f));
+		PlayButtonBox->SetRenderScale(FVector2D(P, P));
 	}
 
 	// Baska bir kamera (oyun kamerasi) kendini aktif ettiyse menu kamerasina geri don
@@ -297,20 +355,26 @@ TSharedRef<SWidget> UFortuneEnchantWidget::RebuildWidget()
 
 void UFortuneEnchantWidget::BuildTree()
 {
+	using namespace FortuneStyle;
 	UWidgetTree* T = WidgetTree;
+	const FLinearColor Purple(0.78f, 0.5f, 1.f);
+	const FLinearColor Label(1.f, 1.f, 1.f, 0.5f);
+
 	UCanvasPanel* Root = T->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("Root"));
 	T->RootWidget = Root;
 
 	UImage* Dim = T->ConstructWidget<UImage>(UImage::StaticClass());
-	Dim->SetColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.6f));
+	Dim->SetColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.62f));
 	UCanvasPanelSlot* DimSlot = Root->AddChildToCanvas(Dim);
 	DimSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
 	DimSlot->SetOffsets(FMargin(0.f));
 
-	UBorder* Panel = T->ConstructWidget<UBorder>(UBorder::StaticClass());
-	Panel->SetBrush(MenuRounded(FLinearColor(0.06f, 0.04f, 0.08f, 0.96f), FLinearColor(0.75f, 0.45f, 1.f, 0.85f), 24.f, 2.f));
-	Panel->SetPadding(FMargin(30.f, 24.f));
-	UCanvasPanelSlot* PanelSlot = Root->AddChildToCanvas(Sized(T, Panel, 720.f, 0.f));
+	UBorder* Outer = nullptr;
+	UBorder* Panel = StyFrame(T, Purple, FLinearColor(0.05f, 0.035f, 0.075f, 0.97f), Outer, 22.f);
+	USizeBox* PanelBox = FortuneStyle::StySized(T, Outer, 1040.f, 0.f);
+	PanelBox->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+	PanelRoot = PanelBox;
+	UCanvasPanelSlot* PanelSlot = Root->AddChildToCanvas(PanelBox);
 	PanelSlot->SetAnchors(FAnchors(0.5f, 0.5f));
 	PanelSlot->SetAlignment(FVector2D(0.5f, 0.5f));
 	PanelSlot->SetAutoSize(true);
@@ -318,99 +382,198 @@ void UFortuneEnchantWidget::BuildTree()
 	UVerticalBox* Col = T->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	Panel->SetContent(Col);
 
-	// Baslik
+	// ---- Baslik
 	UHorizontalBox* Head = T->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
 	Col->AddChildToVerticalBox(Head);
+	UOverlay* Emblem = T->ConstructWidget<UOverlay>(UOverlay::StaticClass());
+	UImage* EmBg = T->ConstructWidget<UImage>(UImage::StaticClass());
+	EmBg->SetBrush(StyRounded(FLinearColor(0.25f, 0.1f, 0.4f, 1.f), Purple, 30.f, 2.5f, FVector2D(60.f, 60.f)));
+	Emblem->AddChildToOverlay(EmBg);
+	UOverlaySlot* EmT = Emblem->AddChildToOverlay(FortuneStyle::StyText(T, TEXT("E"), 30, FLinearColor(0.95f, 0.85f, 1.f)));
+	EmT->SetHorizontalAlignment(HAlign_Center);
+	EmT->SetVerticalAlignment(VAlign_Center);
+	UHorizontalBoxSlot* EmSlot = Head->AddChildToHorizontalBox(FortuneStyle::StySized(T, Emblem, 60.f, 60.f));
+	EmSlot->SetVerticalAlignment(VAlign_Center);
+	EmSlot->SetPadding(FMargin(0.f, 0.f, 16.f, 0.f));
 	UVerticalBox* TitleCol = T->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	Head->AddChildToHorizontalBox(TitleCol)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-	TitleCol->AddChildToVerticalBox(MenuText(T, TEXT("ENCHANT"), 36, FLinearColor(0.85f, 0.6f, 1.f)));
-	UHorizontalBox* CoinRow = T->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-	TitleCol->AddChildToVerticalBox(CoinRow)->SetPadding(FMargin(0.f, 4.f, 0.f, 0.f));
-	UButton* PrevCoin = MenuButton(T, MenuText(T, TEXT("<"), 18, FLinearColor::White), FLinearColor(0.2f, 0.12f, 0.28f, 1.f), FLinearColor(0.85f, 0.6f, 1.f), 10.f);
-	PrevCoin->OnClicked.AddDynamic(this, &UFortuneEnchantWidget::OnPrevCoin);
-	CoinRow->AddChildToHorizontalBox(Sized(T, PrevCoin, 44.f, 36.f))->SetVerticalAlignment(VAlign_Center);
-	CoinNameText = MenuText(T, TEXT("Coin"), 20, FLinearColor::White);
-	UHorizontalBoxSlot* NameSlot = CoinRow->AddChildToHorizontalBox(CoinNameText);
-	NameSlot->SetVerticalAlignment(VAlign_Center);
-	NameSlot->SetPadding(FMargin(12.f, 0.f));
-	UButton* NextCoin = MenuButton(T, MenuText(T, TEXT(">"), 18, FLinearColor::White), FLinearColor(0.2f, 0.12f, 0.28f, 1.f), FLinearColor(0.85f, 0.6f, 1.f), 10.f);
-	NextCoin->OnClicked.AddDynamic(this, &UFortuneEnchantWidget::OnNextCoin);
-	CoinRow->AddChildToHorizontalBox(Sized(T, NextCoin, 44.f, 36.f))->SetVerticalAlignment(VAlign_Center);
+	UHorizontalBoxSlot* TitleSlot = Head->AddChildToHorizontalBox(TitleCol);
+	TitleSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+	TitleSlot->SetVerticalAlignment(VAlign_Center);
+	TitleCol->AddChildToVerticalBox(FortuneStyle::StyText(T, TEXT("ENCHANT"), 32, Purple, true, 160));
+	TitleCol->AddChildToVerticalBox(FortuneStyle::StyText(T, TEXT("Büyü kitabıyla coinine güç kat"), 14, Label, false));
 	UBorder* ScrollPill = T->ConstructWidget<UBorder>(UBorder::StaticClass());
-	ScrollPill->SetBrush(MenuRounded(FLinearColor(0.f, 0.f, 0.f, 0.45f), FLinearColor(0.75f, 0.45f, 1.f, 0.6f), 18.f, 1.5f));
+	ScrollPill->SetBrush(StyRounded(FLinearColor(0.f, 0.f, 0.f, 0.5f), StyWithAlpha(Purple, 0.7f), 22.f, 1.5f));
 	ScrollPill->SetPadding(FMargin(16.f, 6.f));
-	ScrollText = MenuText(T, TEXT("Scroll x0"), 22, FLinearColor(0.85f, 0.75f, 1.f));
+	ScrollText = FortuneStyle::StyText(T, TEXT("Scroll x0"), 22, FLinearColor(0.88f, 0.78f, 1.f));
 	ScrollPill->SetContent(ScrollText);
 	Head->AddChildToHorizontalBox(ScrollPill)->SetVerticalAlignment(VAlign_Center);
 
-	// Tier sanslari: 3 renkli kutu
-	Col->AddChildToVerticalBox(MenuText(T, TEXT("TIER ŞANSLARI"), 15, FLinearColor(1.f, 1.f, 1.f, 0.55f)))->SetPadding(FMargin(0.f, 16.f, 0.f, 6.f));
-	UHorizontalBox* Chances = T->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-	Col->AddChildToVerticalBox(Chances);
+	Col->AddChildToVerticalBox(StyDivider(T, Purple))->SetPadding(FMargin(0.f, 14.f, 0.f, 14.f));
+
+	UHorizontalBox* Main = T->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+	Col->AddChildToVerticalBox(Main);
+
+	// ================= Sol: coin karti + mevcut enchant
+	UVerticalBox* Left = T->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
+	Main->AddChildToHorizontalBox(FortuneStyle::StySized(T, Left, 330.f, 0.f));
+
+	UBorder* Card = T->ConstructWidget<UBorder>(UBorder::StaticClass());
+	Card->SetBrush(StyRounded(FLinearColor(0.f, 0.f, 0.f, 0.35f), FLinearColor(1.f, 1.f, 1.f, 0.08f), 18.f, 1.f));
+	Card->SetPadding(FMargin(16.f, 14.f));
+	Left->AddChildToVerticalBox(Card);
+	UVerticalBox* CardV = T->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
+	Card->SetContent(CardV);
+	UOverlay* IconO = T->ConstructWidget<UOverlay>(UOverlay::StaticClass());
+	CoinIcon = T->ConstructWidget<UImage>(UImage::StaticClass());
+	IconO->AddChildToOverlay(CoinIcon);
+	CoinLetter = FortuneStyle::StyText(T, TEXT("?"), 46, FLinearColor(0.f, 0.f, 0.f, 0.45f));
+	UOverlaySlot* LS = IconO->AddChildToOverlay(CoinLetter);
+	LS->SetHorizontalAlignment(HAlign_Center);
+	LS->SetVerticalAlignment(VAlign_Center);
+	CardV->AddChildToVerticalBox(FortuneStyle::StySized(T, IconO, 110.f, 110.f))->SetHorizontalAlignment(HAlign_Center);
+	CoinNameText = FortuneStyle::StyText(T, TEXT("Coin"), 22, FLinearColor::White);
+	CoinNameText->SetJustification(ETextJustify::Center);
+	CardV->AddChildToVerticalBox(CoinNameText)->SetHorizontalAlignment(HAlign_Center);
+	CoinInfoText = FortuneStyle::StyText(T, TEXT(""), 14, Label);
+	CoinInfoText->SetJustification(ETextJustify::Center);
+	CardV->AddChildToVerticalBox(CoinInfoText)->SetHorizontalAlignment(HAlign_Center);
+	UHorizontalBox* Pick = T->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+	UVerticalBoxSlot* PickSlot = CardV->AddChildToVerticalBox(Pick);
+	PickSlot->SetHorizontalAlignment(HAlign_Center);
+	PickSlot->SetPadding(FMargin(0.f, 10.f, 0.f, 0.f));
+	UButton* PrevCoin = FortuneStyle::StyButton(T, FortuneStyle::StyText(T, TEXT("< ÖNCEKİ"), 14, FLinearColor::White), FLinearColor(0.2f, 0.12f, 0.3f, 1.f), Purple, 10.f);
+	PrevCoin->OnClicked.AddDynamic(this, &UFortuneEnchantWidget::OnPrevCoin);
+	Pick->AddChildToHorizontalBox(FortuneStyle::StySized(T, PrevCoin, 130.f, 36.f))->SetPadding(FMargin(4.f, 0.f));
+	UButton* NextCoin = FortuneStyle::StyButton(T, FortuneStyle::StyText(T, TEXT("SONRAKİ >"), 14, FLinearColor::White), FLinearColor(0.2f, 0.12f, 0.3f, 1.f), Purple, 10.f);
+	NextCoin->OnClicked.AddDynamic(this, &UFortuneEnchantWidget::OnNextCoin);
+	Pick->AddChildToHorizontalBox(FortuneStyle::StySized(T, NextCoin, 130.f, 36.f))->SetPadding(FMargin(4.f, 0.f));
+
+	Left->AddChildToVerticalBox(FortuneStyle::StyText(T, TEXT("MEVCUT ENCHANT"), 13, Label, true, 60))->SetPadding(FMargin(0.f, 16.f, 0.f, 6.f));
+	CurrentBox = T->ConstructWidget<UBorder>(UBorder::StaticClass());
+	CurrentBox->SetPadding(FMargin(14.f, 10.f));
+	UVerticalBox* CurV = T->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
+	CurrentBox->SetContent(CurV);
+	CurrentTier = FortuneStyle::StyText(T, TEXT(""), 14, FLinearColor::White);
+	CurV->AddChildToVerticalBox(CurrentTier);
+	CurrentStat = FortuneStyle::StyText(T, TEXT(""), 20, FLinearColor::White);
+	CurV->AddChildToVerticalBox(CurrentStat);
+	CurrentDesc = FortuneStyle::StyText(T, TEXT(""), 13, FLinearColor(1.f, 1.f, 1.f, 0.6f), false);
+	CurrentDesc->SetAutoWrapText(true);
+	CurV->AddChildToVerticalBox(CurrentDesc);
+	Left->AddChildToVerticalBox(CurrentBox);
+
+	// ================= Sag: sanslar, sonuc, olasi enchantlar
+	UVerticalBox* Right = T->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
+	UHorizontalBoxSlot* RightSlot = Main->AddChildToHorizontalBox(Right);
+	RightSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+	RightSlot->SetPadding(FMargin(22.f, 0.f, 0.f, 0.f));
+
+	Right->AddChildToVerticalBox(FortuneStyle::StyText(T, TEXT("TIER ŞANSLARI"), 13, Label, true, 60))->SetPadding(FMargin(0.f, 0.f, 0.f, 6.f));
 	for (int32 Tier = 1; Tier <= 3; ++Tier)
 	{
 		const FLinearColor C = TierColor(Tier);
-		UBorder* Box = T->ConstructWidget<UBorder>(UBorder::StaticClass());
-		Box->SetBrush(MenuRounded(C * 0.18f + FLinearColor(0.f, 0.f, 0.f, 0.82f), C, 14.f, 2.f));
-		Box->SetPadding(FMargin(10.f, 8.f));
-		UVerticalBox* V = T->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-		Box->SetContent(V);
-		V->AddChildToVerticalBox(MenuText(T, TierName(Tier), 15, C))->SetHorizontalAlignment(HAlign_Center);
-		UTextBlock* Pct = MenuText(T, TEXT("%0"), 26, FLinearColor::White);
-		V->AddChildToVerticalBox(Pct)->SetHorizontalAlignment(HAlign_Center);
+		UHorizontalBox* TR = T->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+		Right->AddChildToVerticalBox(TR)->SetPadding(FMargin(0.f, 3.f));
+		TR->AddChildToHorizontalBox(FortuneStyle::StySized(T, FortuneStyle::StyText(T, TierName(Tier), 14, C), 210.f, 0.f))->SetVerticalAlignment(VAlign_Center);
+		FStyBar Bar = StyMakeBar(T, C, 12.f);
+		UHorizontalBoxSlot* BarSlot = TR->AddChildToHorizontalBox(Bar.Root);
+		BarSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+		BarSlot->SetVerticalAlignment(VAlign_Center);
+		TierFill.Add(Bar.FillSlot);
+		TierRest.Add(Bar.RestSlot);
+		TierFillBorder.Add(Bar.Fill);
+		UTextBlock* Pct = FortuneStyle::StyText(T, TEXT("%0"), 18, FLinearColor::White);
+		Pct->SetJustification(ETextJustify::Right);
+		TR->AddChildToHorizontalBox(FortuneStyle::StySized(T, Pct, 74.f, 0.f))->SetVerticalAlignment(VAlign_Center);
 		ChanceTexts.Add(Pct);
-		UHorizontalBoxSlot* S = Chances->AddChildToHorizontalBox(Box);
-		S->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-		S->SetPadding(FMargin(Tier == 1 ? 0.f : 6.f, 0.f, Tier == 3 ? 0.f : 6.f, 0.f));
 	}
 
-	// Mevcut enchant
-	Col->AddChildToVerticalBox(MenuText(T, TEXT("MEVCUT"), 15, FLinearColor(1.f, 1.f, 1.f, 0.55f)))->SetPadding(FMargin(0.f, 16.f, 0.f, 6.f));
-	CurrentBox = T->ConstructWidget<UBorder>(UBorder::StaticClass());
-	CurrentBox->SetPadding(FMargin(16.f, 10.f));
-	UVerticalBox* CurV = T->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	CurrentBox->SetContent(CurV);
-	CurrentTier = MenuText(T, TEXT(""), 15, FLinearColor::White);
-	CurV->AddChildToVerticalBox(CurrentTier);
-	CurrentStat = MenuText(T, TEXT(""), 22, FLinearColor::White);
-	CurV->AddChildToVerticalBox(CurrentStat);
-	Col->AddChildToVerticalBox(CurrentBox);
-
-	// Sonuc / cark
-	Col->AddChildToVerticalBox(MenuText(T, TEXT("SONUÇ"), 15, FLinearColor(1.f, 1.f, 1.f, 0.55f)))->SetPadding(FMargin(0.f, 16.f, 0.f, 6.f));
+	Right->AddChildToVerticalBox(FortuneStyle::StyText(T, TEXT("SONUÇ"), 13, Label, true, 60))->SetPadding(FMargin(0.f, 14.f, 0.f, 6.f));
 	ResultBox = T->ConstructWidget<UBorder>(UBorder::StaticClass());
-	ResultBox->SetPadding(FMargin(16.f, 14.f));
-	ResultBox->SetBrush(MenuRounded(FLinearColor(0.f, 0.f, 0.f, 0.4f), FLinearColor(1.f, 1.f, 1.f, 0.1f), 16.f, 2.f));
+	ResultBox->SetPadding(FMargin(16.f, 10.f));
+	ResultBox->SetBrush(StyRounded(FLinearColor(0.f, 0.f, 0.f, 0.4f), FLinearColor(1.f, 1.f, 1.f, 0.1f), 16.f, 2.f));
+	ResultBox->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
 	UVerticalBox* ResV = T->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	ResultBox->SetContent(Sized(T, ResV, 0.f, 92.f));
-	ResultTier = MenuText(T, TEXT(""), 18, FLinearColor::White);
+	ResultBox->SetContent(FortuneStyle::StySized(T, ResV, 0.f, 88.f));
+	ResultTier = FortuneStyle::StyText(T, TEXT(""), 16, FLinearColor::White);
 	ResV->AddChildToVerticalBox(ResultTier)->SetHorizontalAlignment(HAlign_Center);
-	ResultStat = MenuText(T, TEXT("?"), 32, FLinearColor::White);
+	ResultStat = FortuneStyle::StyText(T, TEXT("?"), 30, FLinearColor::White);
 	ResV->AddChildToVerticalBox(ResultStat)->SetHorizontalAlignment(HAlign_Center);
-	ResultHint = MenuText(T, TEXT("Enchant'a bas ve şansını dene!"), 14, FLinearColor(1.f, 1.f, 1.f, 0.55f), false);
+	ResultHint = FortuneStyle::StyText(T, TEXT("Enchant'a bas ve şansını dene!"), 13, FLinearColor(1.f, 1.f, 1.f, 0.55f), false);
 	ResV->AddChildToVerticalBox(ResultHint)->SetHorizontalAlignment(HAlign_Center);
-	Col->AddChildToVerticalBox(ResultBox);
+	Right->AddChildToVerticalBox(ResultBox);
 
-	Col->AddChildToVerticalBox(MenuText(T, TEXT("Yeni enchant mevcut enchant'ın yerine geçer."), 14, FLinearColor(1.f, 0.7f, 0.5f, 0.8f), false))
-		->SetPadding(FMargin(0.f, 10.f, 0.f, 0.f));
+	// Olasi enchantlar tablosu
+	Right->AddChildToVerticalBox(FortuneStyle::StyText(T, TEXT("OLASI ENCHANTLAR"), 13, Label, true, 60))->SetPadding(FMargin(0.f, 14.f, 0.f, 4.f));
+	UHorizontalBox* TH = T->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+	Right->AddChildToVerticalBox(TH)->SetPadding(FMargin(10.f, 0.f, 22.f, 2.f));
+	TH->AddChildToHorizontalBox(FortuneStyle::StyText(T, TEXT("BOOST"), 12, Label))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+	for (int32 Tier = 1; Tier <= 3; ++Tier)
+	{
+		UTextBlock* H = FortuneStyle::StyText(T, FString::Printf(TEXT("T%d"), Tier), 12, TierColor(Tier));
+		H->SetJustification(ETextJustify::Right);
+		TH->AddChildToHorizontalBox(FortuneStyle::StySized(T, H, 70.f, 0.f));
+	}
+	UBorder* TableBg = T->ConstructWidget<UBorder>(UBorder::StaticClass());
+	TableBg->SetBrush(StyRounded(FLinearColor(0.f, 0.f, 0.f, 0.35f), FLinearColor(1.f, 1.f, 1.f, 0.06f), 12.f, 1.f));
+	TableBg->SetPadding(FMargin(6.f));
+	USizeBox* TableBox = T->ConstructWidget<USizeBox>(USizeBox::StaticClass());
+	TableBox->SetMaxDesiredHeight(200.f);
+	TableBox->SetContent(TableBg);
+	Right->AddChildToVerticalBox(TableBox);
+	UScrollBox* TableScroll = T->ConstructWidget<UScrollBox>(UScrollBox::StaticClass());
+	TableBg->SetContent(TableScroll);
+	{
+		const UFortuneSettings* S = GetDefault<UFortuneSettings>();
+		for (const TPair<EFortuneEnchantStat, FFortuneEnchantStatConfig>& P : S->EnchantStats)
+		{
+			if (P.Value.RollWeight <= 0.f) continue;
+			UBorder* RowB = T->ConstructWidget<UBorder>(UBorder::StaticClass());
+			RowB->SetPadding(FMargin(8.f, 3.f));
+			RowB->SetBrush(StyRounded(FLinearColor(1.f, 1.f, 1.f, 0.03f), FLinearColor::Transparent, 8.f, 0.f));
+			RowB->SetToolTipText(FText::FromString(UFortuneSubsystem::GetEnchantDescription(P.Key)));
+			TableScroll->AddChild(RowB);
+			UHorizontalBox* R = T->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+			RowB->SetContent(R);
+			R->AddChildToHorizontalBox(FortuneStyle::StyText(T, P.Value.DisplayName.ToString(), 14, FLinearColor(1.f, 1.f, 1.f, 0.9f), false))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+			for (int32 Tier = 1; Tier <= 3; ++Tier)
+			{
+				const float V = P.Value.GetValue(Tier);
+				const FString VS = P.Value.bPercent ? FString::Printf(TEXT("+%%%.0f"), V * 100.f) : FString::Printf(TEXT("+%.1f"), V);
+				UTextBlock* VT = FortuneStyle::StyText(T, VS, 14, TierColor(Tier));
+				VT->SetJustification(ETextJustify::Right);
+				R->AddChildToHorizontalBox(FortuneStyle::StySized(T, VT, 70.f, 0.f));
+			}
+			StatRows.Add(RowB);
+			StatRowStats.Add(P.Key);
+		}
+	}
 
-	// Butonlar
+	Col->AddChildToVerticalBox(FortuneStyle::StyText(T, TEXT("Yeni enchant mevcut enchant'ın yerine geçer."), 13, FLinearColor(1.f, 0.7f, 0.5f, 0.8f), false))
+		->SetPadding(FMargin(0.f, 14.f, 0.f, 0.f));
+
+	// ---- Butonlar
 	UHorizontalBox* Buttons = T->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
 	UVerticalBoxSlot* BtnSlot = Col->AddChildToVerticalBox(Buttons);
 	BtnSlot->SetHorizontalAlignment(HAlign_Center);
-	BtnSlot->SetPadding(FMargin(0.f, 16.f, 0.f, 0.f));
-	RollText = MenuText(T, TEXT("ENCHANT"), 26, FLinearColor(0.95f, 0.85f, 1.f));
-	RollButton = MenuButton(T, RollText, FLinearColor(0.32f, 0.12f, 0.5f, 1.f), FLinearColor(0.85f, 0.6f, 1.f));
+	BtnSlot->SetPadding(FMargin(0.f, 12.f, 0.f, 0.f));
+	RollText = FortuneStyle::StyText(T, TEXT("ENCHANT"), 26, FLinearColor(0.95f, 0.85f, 1.f), true, 120);
+	RollButton = FortuneStyle::StyButton(T, RollText, FLinearColor(0.34f, 0.12f, 0.52f, 1.f), FLinearColor(0.9f, 0.65f, 1.f), 18.f);
 	RollButton->OnClicked.AddDynamic(this, &UFortuneEnchantWidget::OnRollClicked);
-	Buttons->AddChildToHorizontalBox(Sized(T, RollButton, 280.f, 60.f))->SetPadding(FMargin(6.f, 0.f));
-	UButton* Close = MenuButton(T, MenuText(T, TEXT("KAPAT"), 22, FLinearColor(1.f, 0.6f, 0.6f)), FLinearColor(0.25f, 0.06f, 0.06f, 1.f), FLinearColor(1.f, 0.4f, 0.4f));
+	USizeBox* RB = FortuneStyle::StySized(T, RollButton, 300.f, 62.f);
+	RB->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+	RollBox = RB;
+	Buttons->AddChildToHorizontalBox(RB)->SetPadding(FMargin(6.f, 0.f));
+	UButton* Close = FortuneStyle::StyButton(T, FortuneStyle::StyText(T, TEXT("KAPAT"), 22, FLinearColor(1.f, 0.6f, 0.6f)), FLinearColor(0.25f, 0.06f, 0.06f, 1.f), FLinearColor(1.f, 0.4f, 0.4f), 18.f);
 	Close->OnClicked.AddDynamic(this, &UFortuneEnchantWidget::OnCloseClicked);
-	Buttons->AddChildToHorizontalBox(Sized(T, Close, 180.f, 60.f))->SetPadding(FMargin(6.f, 0.f));
+	Buttons->AddChildToHorizontalBox(FortuneStyle::StySized(T, Close, 180.f, 62.f))->SetPadding(FMargin(6.f, 0.f));
 }
 
 void UFortuneEnchantWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+	Age = 0.f;
+	FortuneStyle::StyOpenAnim(PanelRoot, 0.f);
 	SetVisibility(ESlateVisibility::Visible);
 	if (bStandalone)
 	{
@@ -484,8 +647,17 @@ void UFortuneEnchantWidget::Refresh()
 
 	if (Coin)
 	{
-		CoinNameText->SetText(FText::FromString(FString::Printf(TEXT("%s  •  %s"), *Coin->DisplayName.ToString(), *UFortuneSubsystem::GetRarityName(Coin->Rarity))));
-		CoinNameText->SetColorAndOpacity(FSlateColor(UFortuneSubsystem::GetRarityColor(Coin->Rarity)));
+		const FLinearColor RC = UFortuneSubsystem::GetRarityColor(Coin->Rarity);
+		CoinNameText->SetText(Coin->DisplayName);
+		CoinNameText->SetColorAndOpacity(FSlateColor(RC));
+		CoinInfoText->SetText(FText::FromString(bOwned
+			? FString::Printf(TEXT("%s  •  Lv %d"), *UFortuneSubsystem::GetRarityName(Coin->Rarity), Owned.Level)
+			: UFortuneSubsystem::GetRarityName(Coin->Rarity)));
+		// Coin simgesi: rengi + nadirlik halkasi (enchantliysa tier renginde)
+		const FLinearColor Ring = (bOwned && Owned.Enchant.IsActive()) ? TierColor(Owned.Enchant.Tier) : RC;
+		CoinIcon->SetBrush(FortuneStyle::StyRounded(bOwned ? Coin->IconColor : FLinearColor(0.05f, 0.05f, 0.06f), Ring, 55.f, 4.f, FVector2D(110.f, 110.f)));
+		const FString Name = Coin->DisplayName.ToString();
+		CoinLetter->SetText(FText::FromString(Name.Len() > 0 ? Name.Left(1).ToUpper() : FString(TEXT("?"))));
 	}
 
 	const int32 Scrolls = F->GetItemCount(EFortuneItemType::EnchantScroll);
@@ -499,9 +671,23 @@ void UFortuneEnchantWidget::Refresh()
 	{
 		const FString Pct = (i == 2) ? FString::Printf(TEXT("%%%.1f"), Ch[i] * 100.f) : FString::Printf(TEXT("%%%.0f"), Ch[i] * 100.f);
 		ChanceTexts[i]->SetText(FText::FromString(Pct));
+		if (TierFill.IsValidIndex(i))
+		{
+			FortuneStyle::FStyBar Bar;
+			Bar.FillSlot = TierFill[i];
+			Bar.RestSlot = TierRest[i];
+			Bar.Fill = TierFillBorder[i];
+			FortuneStyle::StySetBar(Bar, Ch[i]);
+		}
 	}
 
 	ShowEnchant(CurrentBox, CurrentTier, CurrentStat, bOwned ? Owned.Enchant : FFortuneEnchant(), false);
+	if (CurrentDesc)
+	{
+		CurrentDesc->SetText(FText::FromString((bOwned && Owned.Enchant.IsActive())
+			? UFortuneSubsystem::GetEnchantDescription(Owned.Enchant.Stat)
+			: FString(TEXT("Bu coinde henüz enchant yok."))));
+	}
 
 	const bool bCan = bOwned && Scrolls > 0 && !bRolling;
 	RollButton->SetIsEnabled(bCan);
@@ -582,6 +768,9 @@ void UFortuneEnchantWidget::NativeTick(const FGeometry& MyGeometry, float InDelt
 				const FFortuneEnchantStatConfig* Cfg = S->EnchantStats.Find(Fake.Stat);
 				Fake.Value = Cfg ? Cfg->GetValue(Fake.Tier) : 0.f;
 				ShowEnchant(ResultBox, ResultTier, ResultStat, Fake, true);
+				HighlightRow = StatRowStats.IndexOfByKey(Fake.Stat);
+				HighlightTier = Fake.Tier;
+				HighlightTime = 0.35f;
 			}
 		}
 		if (RollTime >= Dur)
@@ -591,8 +780,32 @@ void UFortuneEnchantWidget::NativeTick(const FGeometry& MyGeometry, float InDelt
 			ResultHint->SetText(FText::FromString(RollResult.Tier >= 3 ? TEXT("EFSANEVİ!") : (RollResult.Tier == 2 ? TEXT("Harika!") : TEXT("Enchant uygulandı."))));
 			ResultHint->SetColorAndOpacity(FSlateColor(TierColor(RollResult.Tier)));
 			ResultPop = 1.f;
+			HighlightRow = StatRowStats.IndexOfByKey(RollResult.Stat);
+			HighlightTier = RollResult.Tier;
+			HighlightTime = 2.5f;
 			Refresh();
 		}
+	}
+
+	Age += InDeltaTime;
+	FortuneStyle::StyOpenAnim(PanelRoot, Age);
+
+	// Olasi enchant tablosu: carkin durdugu / cikan satir parlar
+	HighlightTime = FMath::Max(0.f, HighlightTime - InDeltaTime);
+	for (int32 i = 0; i < StatRows.Num(); ++i)
+	{
+		const float H = (i == HighlightRow) ? FMath::Clamp(HighlightTime * 3.f, 0.f, 1.f) : 0.f;
+		const FLinearColor C = TierColor(HighlightTier);
+		StatRows[i]->SetBrush(FortuneStyle::StyRounded(FMath::Lerp(FLinearColor(1.f, 1.f, 1.f, 0.03f), FLinearColor(C.R * 0.35f, C.G * 0.35f, C.B * 0.35f, 0.9f), H),
+			FortuneStyle::StyWithAlpha(C, H), 8.f, 1.5f * H));
+	}
+
+	// Enchant yapilabiliyorsa buton nabiz gibi atar
+	if (RollBox)
+	{
+		const bool bReady = RollButton && RollButton->GetIsEnabled() && !bRolling;
+		const float S = bReady ? 1.f + 0.035f * (0.5f + 0.5f * FMath::Sin(Age * 4.f)) : 1.f;
+		RollBox->SetRenderScale(FVector2D(S, S));
 	}
 
 	// Sonuc gelince kutu buyuyup oturur

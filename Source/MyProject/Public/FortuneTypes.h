@@ -64,7 +64,14 @@ enum class EFortuneCoinShape : uint8
 	Hexagon,
 	Decagon,
 	Scalloped,   // dilimli kenar
-	Gear         // disli
+	Gear,        // disli
+	Dodecagon,   // 12 kenar
+	Star,        // 5 koseli yildiz
+	Clover,      // dort yaprakli yonca
+	Ghost,       // ust yuvarlak, alt dalgali (hayalet)
+	GearRing,    // ortasi delik disli (cark)
+	Pumpkin,     // genis, dilimli, ustu cukur balkabagi
+	Skull        // kafatasi: yuvarlak kafa, elmacik, dar cene
 };
 
 /** Coin masaya indiginde cikan hazir efekt. */
@@ -77,6 +84,30 @@ enum class EFortuneLandFX : uint8
 	GoldRing,  // altin halka dalgasi + parilti
 	Leaves,    // yesil yapraklar
 	Flame      // alev halkasi + korlar
+};
+
+/** Coinin etrafinda surekli oynayan tema efekti. */
+UENUM(BlueprintType)
+enum class EFortuneCoinAura : uint8
+{
+	None,
+	Fire,     // kenardan yukselen alevler + korlar
+	Chains,   // yuzlerde capraz zincirler + asma kilitler
+	Halo,     // kenarda donen isik halkasi
+	Orbit,    // etrafinda donen yildizlar/gezegenler
+	Sparkle,  // yuzeyde parildayan isiltilar
+	Thorns,   // dikenli sarmasik halka + yuzde low-poly siyah gul
+	Kelp,     // kenardan sallanan yosunlar + kabarciklar
+	Zone,     // donen neon tehlike halkalari + yayilan dalga
+	Lock,     // zincirler + yuzde buyuk asma kilit
+	Tape,     // kenara sarilmis bantlar + etiketler
+	Bolts,    // koselerde civata basliklari
+	Stem,     // ustte balkabagi sapi + yaprak + kivrik dal
+	Wings,    // yanlarda kanatlar + tepede hale
+	ClockHands, // yuzde donen saat akrep/yelkovan
+	Compass,  // yuzde titreyen pusula ignesi
+	Bones,    // coinin arkasindan cikan capraz kemikler
+	Vault     // kasa kapisi: yuzde donen 3 kollu tekerlek
 };
 
 /** Enchant Scroll ile coinlere gelen boost turleri. */

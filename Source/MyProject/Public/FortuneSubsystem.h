@@ -192,6 +192,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Fortune|Upgrades")
 	bool BuyUpgrade(EFortuneUpgradeType Upgrade);
 
+	/** Count seviyenin toplam maliyeti (Count <= 0: paranin yettigi kadar). OutLevels: kac seviye. Maks seviyedeyse -1. */
+	double GetUpgradeCostMulti(EFortuneUpgradeType Upgrade, int32 Count, int32& OutLevels) const;
+
+	/** Birden fazla seviye al (Count <= 0: paranin yettigi kadar). Alinan seviye sayisini dondurur. */
+	int32 BuyUpgradeMulti(EFortuneUpgradeType Upgrade, int32 Count);
+
 	// ---------------- Gacha ----------------
 	UFUNCTION(BlueprintPure, Category = "Fortune|Gacha")
 	double GetSummonCost() const;
@@ -210,6 +216,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Fortune|Gacha")
 	float GetSummonChance(const UFortuneCoinData* Coin) const;
 
+	/** TEST: isminde Name gecen coin(ler)i ver ("" = hepsi). Verilen sayi. */
+	int32 DebugGiveCoins(const FString& Name);
+
+	/** Count'lu summon fiyati (x10 = 9 fiyatina, 1 bedava). */
+	double GetMultiSummonCost(int32 Count) const;
+
+	/** Count kez summon: tek seferde oder, sonuclari doldurur. Basarisizsa false. */
+	bool SummonCoins(int32 Count, TArray<UFortuneCoinData*>& OutCoins, TArray<bool>& OutDuplicates);
+
 	/** Para harcayip agirliga gore rastgele coin cikarir. */
 	UFUNCTION(BlueprintCallable, Category = "Fortune|Gacha")
 	bool SummonCoin(UFortuneCoinData*& OutCoin, bool& bOutDuplicate);
@@ -222,6 +237,11 @@ public:
 	void ResetProgress();
 
 private:
+	/** Luck dahil agirlikli rastgele coin sec (para harcamaz). */
+	UFortuneCoinData* RollSummonCoin() const;
+	/** Cikan coini ver (varsa XP). Tekrar ise true. */
+	bool GrantSummonedCoin(UFortuneCoinData* Coin);
+
 	void LoadCoins();
 	void LoadOrCreateSave();
 	void CreateNewSave();

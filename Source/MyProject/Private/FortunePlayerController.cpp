@@ -97,6 +97,26 @@ void AFortunePlayerController::GiveScrolls(int32 Count)
 	}
 }
 
+void AFortunePlayerController::GiveCoin(const FString& Name)
+{
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UFortuneSubsystem* F = GI->GetSubsystem<UFortuneSubsystem>())
+		{
+			const int32 N = F->DebugGiveCoins(Name);
+			if (GEngine)
+			{
+				GEngine->AddOnScreenDebugMessage(3, 2.5f, FColor(120, 220, 255), FString::Printf(TEXT("TEST: %d coin verildi (%s)"), N, *Name));
+			}
+		}
+	}
+}
+
+void AFortunePlayerController::GiveAllCoins()
+{
+	GiveCoin(FString());
+}
+
 void AFortunePlayerController::GiveMoney(double Amount)
 {
 	if (UGameInstance* GI = GetGameInstance())
