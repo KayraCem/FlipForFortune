@@ -2,6 +2,7 @@
 #include "FortuneSubsystem.h"
 #include "FortuneSettings.h"
 #include "FortuneCoinData.h"
+#include "FortuneCoinIconStudio.h"
 #include "FortuneHUDWidget.h"
 #include "FortunePlayerController.h"
 #include "Blueprint/WidgetTree.h"
@@ -400,7 +401,6 @@ void UFortuneEnchantWidget::BuildTree()
 	TitleSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
 	TitleSlot->SetVerticalAlignment(VAlign_Center);
 	TitleCol->AddChildToVerticalBox(FortuneStyle::StyText(T, TEXT("ENCHANT"), 32, Purple, true, 160));
-	TitleCol->AddChildToVerticalBox(FortuneStyle::StyText(T, TEXT("Büyü kitabıyla coinine güç kat"), 14, Label, false));
 	UBorder* ScrollPill = T->ConstructWidget<UBorder>(UBorder::StaticClass());
 	ScrollPill->SetBrush(StyRounded(FLinearColor(0.f, 0.f, 0.f, 0.5f), StyWithAlpha(Purple, 0.7f), 22.f, 1.5f));
 	ScrollPill->SetPadding(FMargin(16.f, 6.f));
@@ -441,12 +441,12 @@ void UFortuneEnchantWidget::BuildTree()
 	UVerticalBoxSlot* PickSlot = CardV->AddChildToVerticalBox(Pick);
 	PickSlot->SetHorizontalAlignment(HAlign_Center);
 	PickSlot->SetPadding(FMargin(0.f, 10.f, 0.f, 0.f));
-	UButton* PrevCoin = FortuneStyle::StyButton(T, FortuneStyle::StyText(T, TEXT("< ÖNCEKİ"), 14, FLinearColor::White), FLinearColor(0.2f, 0.12f, 0.3f, 1.f), Purple, 10.f);
+	UButton* PrevCoin = FortuneStyle::StyButton(T, FortuneStyle::StyText(T, TEXT("<"), 20, FLinearColor::White), FLinearColor(0.2f, 0.12f, 0.3f, 1.f), Purple, 10.f);
 	PrevCoin->OnClicked.AddDynamic(this, &UFortuneEnchantWidget::OnPrevCoin);
-	Pick->AddChildToHorizontalBox(FortuneStyle::StySized(T, PrevCoin, 130.f, 36.f))->SetPadding(FMargin(4.f, 0.f));
-	UButton* NextCoin = FortuneStyle::StyButton(T, FortuneStyle::StyText(T, TEXT("SONRAKİ >"), 14, FLinearColor::White), FLinearColor(0.2f, 0.12f, 0.3f, 1.f), Purple, 10.f);
+	Pick->AddChildToHorizontalBox(FortuneStyle::StySized(T, PrevCoin, 64.f, 36.f))->SetPadding(FMargin(4.f, 0.f));
+	UButton* NextCoin = FortuneStyle::StyButton(T, FortuneStyle::StyText(T, TEXT(">"), 20, FLinearColor::White), FLinearColor(0.2f, 0.12f, 0.3f, 1.f), Purple, 10.f);
 	NextCoin->OnClicked.AddDynamic(this, &UFortuneEnchantWidget::OnNextCoin);
-	Pick->AddChildToHorizontalBox(FortuneStyle::StySized(T, NextCoin, 130.f, 36.f))->SetPadding(FMargin(4.f, 0.f));
+	Pick->AddChildToHorizontalBox(FortuneStyle::StySized(T, NextCoin, 64.f, 36.f))->SetPadding(FMargin(4.f, 0.f));
 
 	Left->AddChildToVerticalBox(FortuneStyle::StyText(T, TEXT("MEVCUT ENCHANT"), 13, Label, true, 60))->SetPadding(FMargin(0.f, 16.f, 0.f, 6.f));
 	CurrentBox = T->ConstructWidget<UBorder>(UBorder::StaticClass());
@@ -460,6 +460,7 @@ void UFortuneEnchantWidget::BuildTree()
 	CurrentDesc = FortuneStyle::StyText(T, TEXT(""), 13, FLinearColor(1.f, 1.f, 1.f, 0.6f), false);
 	CurrentDesc->SetAutoWrapText(true);
 	CurV->AddChildToVerticalBox(CurrentDesc);
+	CurrentDesc->SetVisibility(ESlateVisibility::Collapsed);
 	Left->AddChildToVerticalBox(CurrentBox);
 
 	// ================= Sag: sanslar, sonuc, olasi enchantlar
@@ -499,14 +500,14 @@ void UFortuneEnchantWidget::BuildTree()
 	ResV->AddChildToVerticalBox(ResultTier)->SetHorizontalAlignment(HAlign_Center);
 	ResultStat = FortuneStyle::StyText(T, TEXT("?"), 30, FLinearColor::White);
 	ResV->AddChildToVerticalBox(ResultStat)->SetHorizontalAlignment(HAlign_Center);
-	ResultHint = FortuneStyle::StyText(T, TEXT("Enchant'a bas ve şansını dene!"), 13, FLinearColor(1.f, 1.f, 1.f, 0.55f), false);
+	ResultHint = FortuneStyle::StyText(T, TEXT(""), 13, FLinearColor(1.f, 1.f, 1.f, 0.55f), false);
 	ResV->AddChildToVerticalBox(ResultHint)->SetHorizontalAlignment(HAlign_Center);
 	Right->AddChildToVerticalBox(ResultBox);
 
 	// Olasi enchantlar tablosu
-	Right->AddChildToVerticalBox(FortuneStyle::StyText(T, TEXT("OLASI ENCHANTLAR"), 13, Label, true, 60))->SetPadding(FMargin(0.f, 14.f, 0.f, 4.f));
 	UHorizontalBox* TH = T->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
 	Right->AddChildToVerticalBox(TH)->SetPadding(FMargin(10.f, 0.f, 22.f, 2.f));
+	TH->SetVisibility(ESlateVisibility::Collapsed);   // sade gorunum: olasi enchant tablosu gizli
 	TH->AddChildToHorizontalBox(FortuneStyle::StyText(T, TEXT("BOOST"), 12, Label))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
 	for (int32 Tier = 1; Tier <= 3; ++Tier)
 	{
@@ -521,6 +522,7 @@ void UFortuneEnchantWidget::BuildTree()
 	TableBox->SetMaxDesiredHeight(200.f);
 	TableBox->SetContent(TableBg);
 	Right->AddChildToVerticalBox(TableBox);
+	TableBox->SetVisibility(ESlateVisibility::Collapsed);
 	UScrollBox* TableScroll = T->ConstructWidget<UScrollBox>(UScrollBox::StaticClass());
 	TableBg->SetContent(TableScroll);
 	{
@@ -549,8 +551,6 @@ void UFortuneEnchantWidget::BuildTree()
 		}
 	}
 
-	Col->AddChildToVerticalBox(FortuneStyle::StyText(T, TEXT("Yeni enchant mevcut enchant'ın yerine geçer."), 13, FLinearColor(1.f, 0.7f, 0.5f, 0.8f), false))
-		->SetPadding(FMargin(0.f, 14.f, 0.f, 0.f));
 
 	// ---- Butonlar
 	UHorizontalBox* Buttons = T->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
@@ -655,9 +655,20 @@ void UFortuneEnchantWidget::Refresh()
 			: UFortuneSubsystem::GetRarityName(Coin->Rarity)));
 		// Coin simgesi: rengi + nadirlik halkasi (enchantliysa tier renginde)
 		const FLinearColor Ring = (bOwned && Owned.Enchant.IsActive()) ? TierColor(Owned.Enchant.Tier) : RC;
-		CoinIcon->SetBrush(FortuneStyle::StyRounded(bOwned ? Coin->IconColor : FLinearColor(0.05f, 0.05f, 0.06f), Ring, 55.f, 4.f, FVector2D(110.f, 110.f)));
-		const FString Name = Coin->DisplayName.ToString();
-		CoinLetter->SetText(FText::FromString(Name.Len() > 0 ? Name.Left(1).ToUpper() : FString(TEXT("?"))));
+		if (Coin->HeadsTexture)
+		{
+			// Coinin 3D gorunusu (aurasiyla)
+			AFortuneCoinIconStudio::ApplyIcon(CoinIcon, this, Coin, bOwned, 116.f);
+			CoinLetter->SetText(bOwned ? FText::GetEmpty() : FText::FromString(TEXT("?")));
+			CoinLetter->SetColorAndOpacity(FSlateColor(Ring));
+		}
+		else
+		{
+			CoinIcon->SetBrush(FortuneStyle::StyRounded(bOwned ? Coin->IconColor : FLinearColor(0.05f, 0.05f, 0.06f), Ring, 55.f, 4.f, FVector2D(110.f, 110.f)));
+			CoinIcon->SetColorAndOpacity(FLinearColor::White);
+			const FString Name = Coin->DisplayName.ToString();
+			CoinLetter->SetText(FText::FromString(Name.Len() > 0 ? Name.Left(1).ToUpper() : FString(TEXT("?"))));
+		}
 	}
 
 	const int32 Scrolls = F->GetItemCount(EFortuneItemType::EnchantScroll);

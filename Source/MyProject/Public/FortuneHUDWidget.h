@@ -21,6 +21,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Fortune")
 	static FText FormatMoney(double Value);
 
+	/** Birinci sahis nisangahi + baktigin esyanin adi ("[E] Yukseltmeler"). */
+	void SetCrosshair(bool bShow, const FText& Target);
+
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 	virtual void NativeConstruct() override;
@@ -48,8 +51,23 @@ private:
 	UFUNCTION()
 	void HandleInventoryChanged();
 
+	UFUNCTION() void HandleCollectionIcon();
+	UFUNCTION() void HandleInventoryIcon();
+
+	/** Sol kenar: ikonlu buton (Coin Collection / Envanter). */
+	class UButton* MakeSideButton(const TCHAR* IconPath, const FString& Label, const FString& Key, const FLinearColor& Accent);
+
 	UPROPERTY()
 	TObjectPtr<UTextBlock> MoneyText;
+
+	UPROPERTY()
+	TObjectPtr<UWidget> CrosshairDot;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> AimText;
+
+	bool bCrosshairShown = false;
+	FString AimLabel;
 
 	UPROPERTY()
 	TObjectPtr<UTextBlock> ScrollText;

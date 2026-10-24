@@ -167,13 +167,16 @@ void AFortuneCoinPreview::SetCoin(const UFortuneCoinData* Coin, bool bOwned, boo
 void AFortuneCoinPreview::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	Angle += DeltaSeconds * 50.f;
-	PopIn = FMath::Min(1.f, PopIn + DeltaSeconds * 4.f);
+	if (!bFixedPose)
+	{
+		Angle += DeltaSeconds * 50.f;
+		PopIn = FMath::Min(1.f, PopIn + DeltaSeconds * 4.f);
+	}
 	const float Ease = 1.f - FMath::Pow(1.f - PopIn, 3.f);
 
 	// Hafif sallanma + kendi etrafinda yavas donus (iki yuzu de gorunur)
 	const FQuat Spin(SpinAxis, FMath::DegreesToRadians(Angle));
 	Spinner->SetWorldRotation(Spin * BaseRot);
 	Spinner->SetRelativeScale3D(FVector(FMath::Lerp(0.6f, 1.f, Ease)));
-	Spinner->SetRelativeLocation(FVector(0.f, 0.f, FMath::Sin(Angle * 0.05f) * 0.4f));
+	Spinner->SetRelativeLocation(bFixedPose ? FVector::ZeroVector : FVector(0.f, 0.f, FMath::Sin(Angle * 0.05f) * 0.4f));
 }

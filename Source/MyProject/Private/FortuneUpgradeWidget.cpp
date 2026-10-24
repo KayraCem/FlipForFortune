@@ -135,7 +135,6 @@ void UFortuneUpgradeWidget::BuildTree()
 	TitleSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
 	TitleSlot->SetVerticalAlignment(VAlign_Center);
 	TitleCol->AddChildToVerticalBox(StyText(T, TEXT("YÜKSELTMELER"), 32, UpgGold, true, 120));
-	TitleCol->AddChildToVerticalBox(StyText(T, TEXT("Örste paranı güce dönüştür"), 14, FLinearColor(1.f, 1.f, 1.f, 0.55f), false));
 
 	UBorder* MoneyPill = T->ConstructWidget<UBorder>(UBorder::StaticClass());
 	MoneyPill->SetBrush(StyRounded(FLinearColor(0.f, 0.f, 0.f, 0.55f), StyWithAlpha(UpgGold, 0.7f), 22.f, 1.5f));
@@ -162,12 +161,11 @@ void UFortuneUpgradeWidget::BuildTree()
 		const FLinearColor C = i == 0 ? Infos[1].Color : (i == 1 ? Infos[3].Color : (i == 2 ? Infos[4].Color : Infos[2].Color));
 		UTextBlock* L = StyText(T, TEXT(""), 14, C);
 		StatChips.Add(L);
-		InfoRow->AddChildToHorizontalBox(StyChip(T, L, C))->SetPadding(FMargin(0.f, 0.f, 8.f, 0.f));
+		UBorder* Chip = StyChip(T, L, C);
+		InfoRow->AddChildToHorizontalBox(Chip)->SetPadding(FMargin(0.f, 0.f, 8.f, 0.f));
+		Chip->SetVisibility(ESlateVisibility::Collapsed);   // sade gorunum
 	}
 	InfoRow->AddChildToHorizontalBox(T->ConstructWidget<USpacer>(USpacer::StaticClass()))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-	UHorizontalBoxSlot* ModeLabel = InfoRow->AddChildToHorizontalBox(StyText(T, TEXT("AL:"), 14, FLinearColor(1.f, 1.f, 1.f, 0.55f)));
-	ModeLabel->SetVerticalAlignment(VAlign_Center);
-	ModeLabel->SetPadding(FMargin(0.f, 0.f, 8.f, 0.f));
 	for (int32 m = 0; m < 3; ++m)
 	{
 		UButton* MB = StyButton(T, StyText(T, ModeNames[m], 15, FLinearColor::White), FLinearColor(0.16f, 0.14f, 0.12f, 1.f), UpgGold, 10.f);
@@ -222,6 +220,8 @@ void UFortuneUpgradeWidget::BuildTree()
 		UTextBlock* Desc = StyText(T, Cfg.Description.ToString(), 14, FLinearColor(1.f, 1.f, 1.f, 0.6f), false);
 		Desc->SetAutoWrapText(true);
 		NameCol->AddChildToVerticalBox(Desc);
+		Desc->SetVisibility(ESlateVisibility::Collapsed);        // aciklama: fareyle uzerine gelince
+		RowBorder->SetToolTipText(Cfg.Description);
 		FStyBar Bar = StyMakeBar(T, Info.Color, 7.f);
 		NameCol->AddChildToVerticalBox(Bar.Root)->SetPadding(FMargin(0.f, 6.f, 0.f, 0.f));
 
@@ -373,7 +373,7 @@ void UFortuneUpgradeWidget::Refresh()
 		const double Cost = F->GetUpgradeCostMulti(R.Type, ModeCounts[BuyMode], Levels);
 		const float Now = Cfg.ValuePerLevel * Lv;
 
-		R.Level->SetText(FText::FromString(FString::Printf(TEXT("Lv %d / %d"), Lv, Cfg.MaxLevel)));
+		R.Level->SetText(FText::FromString(FString::Printf(TEXT("Lv %d"), Lv)));
 		const float Pct = Cfg.MaxLevel > 0 ? float(Lv) / float(Cfg.MaxLevel) : 0.f;
 		FortuneStyle::FStyBar Bar;
 		Bar.FillSlot = R.BarFill;
@@ -383,7 +383,7 @@ void UFortuneUpgradeWidget::Refresh()
 
 		if (Cost < 0.0)
 		{
-			R.Value->SetText(FText::FromString(FString::Printf(TEXT("%s\nMAKS"), *FormatBonus(R.Type, Now))));
+			R.Value->SetText(FText::FromString(FormatBonus(R.Type, Now)));
 			R.Cost->SetText(FText::FromString(TEXT("MAKS")));
 			R.Cost->SetColorAndOpacity(FSlateColor(UpgGold));
 			R.CostSub->SetText(FText::GetEmpty());
@@ -392,9 +392,9 @@ void UFortuneUpgradeWidget::Refresh()
 		else
 		{
 			const float Next = Cfg.ValuePerLevel * (Lv + Levels);
-			R.Value->SetText(FText::FromString(FString::Printf(TEXT("%s\n> %s"), *FormatBonus(R.Type, Now), *FormatBonus(R.Type, Next))));
+			R.Value->SetText(FText::FromString(FString::Printf(TEXT("%s  >  %s"), *FormatBonus(R.Type, Now), *FormatBonus(R.Type, Next))));
 			R.Cost->SetText(FText::FromString(FString::Printf(TEXT("$ %s"), *UFortuneHUDWidget::FormatMoney(Cost).ToString())));
-			R.CostSub->SetText(FText::FromString(FString::Printf(TEXT("+%d Lv"), Levels)));
+			R.CostSub->SetText(Levels > 1 ? FText::FromString(FString::Printf(TEXT("+%d Lv"), Levels)) : FText::GetEmpty());
 			const bool bAfford = Money >= Cost;
 			R.Button->SetIsEnabled(bAfford);
 			R.Cost->SetColorAndOpacity(FSlateColor(bAfford ? FLinearColor::White : FLinearColor(1.f, 0.45f, 0.45f)));

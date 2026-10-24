@@ -71,7 +71,8 @@ enum class EFortuneCoinShape : uint8
 	Ghost,       // ust yuvarlak, alt dalgali (hayalet)
 	GearRing,    // ortasi delik disli (cark)
 	Pumpkin,     // genis, dilimli, ustu cukur balkabagi
-	Skull        // kafatasi: yuvarlak kafa, elmacik, dar cene
+	Skull,       // kafatasi: yuvarlak kafa, elmacik, dar cene
+	Saturn       // gezegen: kure + egik halka (Galaxy)
 };
 
 /** Coin masaya indiginde cikan hazir efekt. */
@@ -107,7 +108,10 @@ enum class EFortuneCoinAura : uint8
 	ClockHands, // yuzde donen saat akrep/yelkovan
 	Compass,  // yuzde titreyen pusula ignesi
 	Bones,    // coinin arkasindan cikan capraz kemikler
-	Vault     // kasa kapisi: yuzde donen 3 kollu tekerlek
+	Vault,    // kasa kapisi: yuzde donen 3 kollu tekerlek
+	EyeFlames, // kafatasi gozlerinden yukselen mor alevler + capraz kemikler
+	Pages,    // takvim: ustte spiral halkalar, yaprak yaprak kopup ucan sayfalar
+	RoseBloom // 3D siyah gul + dikenli sarmasik + dokulen yapraklar
 };
 
 /** Enchant Scroll ile coinlere gelen boost turleri. */

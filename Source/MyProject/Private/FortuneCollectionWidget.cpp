@@ -1,6 +1,7 @@
 #include "FortuneCollectionWidget.h"
 #include "FortuneSubsystem.h"
 #include "FortuneCoinData.h"
+#include "FortuneCoinIconStudio.h"
 #include "FortuneSettings.h"
 #include "FortuneCoinPreview.h"
 #include "FortuneHUDWidget.h"
@@ -233,7 +234,7 @@ void UFortuneCollectionWidget::BuildTree()
 	// Butonlar: TAK | GERI | ENCHANT
 	UHorizontalBox* Buttons = T->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("Buttons"));
 	UVerticalBoxSlot* ButtonsSlot = Left->AddChildToVerticalBox(Buttons);
-	ButtonsSlot->SetHorizontalAlignment(HAlign_Center);
+	ButtonsSlot->SetHorizontalAlignment(HAlign_Left);   // TAK + GERI en solda
 	ButtonsSlot->SetPadding(FMargin(0.f, 12.f, 0.f, 0.f));
 
 	auto AddButton = [&](UButton* Btn)
@@ -521,7 +522,11 @@ void UFortuneCollectionWidget::RefreshSlots()
 
 		if (E.bOwned)
 		{
-			if (E.Coin->Icon)
+			if (E.Coin->HeadsTexture)
+			{
+				AFortuneCoinIconStudio::ApplyIcon(S->Icon, this, E.Coin, true, 62.f);   // coinin 3D gorunusu
+			}
+			else if (E.Coin->Icon)
 			{
 				FSlateBrush IconBrush;
 				IconBrush.SetResourceObject(E.Coin->Icon);
@@ -538,7 +543,14 @@ void UFortuneCollectionWidget::RefreshSlots()
 		}
 		else
 		{
-			S->Icon->SetBrush(ColRounded(FLinearColor(0.03f, 0.03f, 0.035f), FLinearColor(1.f, 1.f, 1.f, 0.08f), 29.f, 2.f, FVector2D(58.f, 58.f)));
+			if (E.Coin->HeadsTexture)
+			{
+				AFortuneCoinIconStudio::ApplyIcon(S->Icon, this, E.Coin, false, 62.f);   // karanlik siluet
+			}
+			else
+			{
+				S->Icon->SetBrush(ColRounded(FLinearColor(0.03f, 0.03f, 0.035f), FLinearColor(1.f, 1.f, 1.f, 0.08f), 29.f, 2.f, FVector2D(58.f, 58.f)));
+			}
 			S->LevelText->SetText(FText::FromString(TEXT("?")));
 			S->LevelText->SetColorAndOpacity(FSlateColor(FLinearColor(1.f, 1.f, 1.f, 0.4f)));
 		}

@@ -37,6 +37,43 @@ public:
 
 	bool IsBusy() const { return State != EState::Idle; }
 
+	/** Doluysa summon bu sandikta oynar (ayri SUMMON SAHNESI: kopya cesme, kendi kamerasi). */
+	UPROPERTY(EditAnywhere, Category = "Gacha")
+	TObjectPtr<AFortuneGachaChest> StageChest;
+
+	/** Bu sandik bir summon sahnesiyse: animasyon boyunca bu kameraya gecilir, bitince geri donulur. */
+	UPROPERTY(EditAnywhere, Category = "Gacha")
+	TObjectPtr<class ACameraActor> StageCamera;
+
+	/** Sifir degilse coinler buradan (aktore gore, dunya ekseninde) cikar: ornegin cesmenin on tarafindaki su. */
+	UPROPERTY(EditAnywhere, Category = "Gacha")
+	FVector EmergeOffset = FVector::ZeroVector;
+
+	/** Coklu summonda coinlerin cikis noktalarinin yana yayilmasi (cm). */
+	UPROPERTY(EditAnywhere, Category = "Gacha")
+	float EmergeSpread = 40.f;
+
+	/** Summon sirasinda parlayacak cesme. */
+	UPROPERTY(EditAnywhere, Category = "Gacha")
+	TObjectPtr<class AFortuneFountain> LinkedFountain;
+
+	/** Sonuc ekrani: TAMAM (oyuna don). */
+	void CloseRevealAndReturn();
+
+	/** Sonuc ekrani: TEKRAR / x10 (sahnede kalarak yeniden summon). false = para yetmiyor. */
+	bool RepeatSummon(int32 Count);
+
+	/** Son summon kac coinlikti (TEKRAR butonu icin). */
+	int32 GetLastCount() const { return LastCount; }
+
+	/** true: sandik modeli gizlenir (dilek cesmesi). Summon, isik ve coin animasyonu aynen calisir. */
+	UPROPERTY(EditAnywhere, Category = "Gacha")
+	bool bHideModel = false;
+
+	/** Sifir degilse tiklama kutusunun yari boyutu (cm), ornegin tum cesmeyi kaplasin diye. */
+	UPROPERTY(EditAnywhere, Category = "Gacha")
+	FVector ClickExtent = FVector::ZeroVector;
+
 	UPROPERTY(EditAnywhere, Category = "Gacha")
 	TObjectPtr<USoundBase> ShakeSound;
 
@@ -54,7 +91,7 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
-	enum class EState : uint8 { Idle, Shake, Open, Fly, Reveal, Closing };
+	enum class EState : uint8 { Idle, Shake, Open, Fly, Reveal, Closing, Legend };
 
 	UStaticMeshComponent* MakePart(const TCHAR* Name, USceneComponent* Parent, UStaticMesh* Mesh, const FVector& Loc, const FVector& SizeCm, const FRotator& Rot = FRotator::ZeroRotator);
 	void SetLid(float Angle);
@@ -101,6 +138,9 @@ private:
 	TObjectPtr<UUserWidget> RevealWidget;
 
 	UPROPERTY()
+	TObjectPtr<UUserWidget> MoneyChip;
+
+	UPROPERTY()
 	TObjectPtr<UFortuneCoinData> WonCoin;
 
 	/** Coklu acilim: cikan coinler (nadirlige gore siralı, en iyisi en sonda), ekrandaki yerleri. */
@@ -114,6 +154,21 @@ private:
 	TArray<FVector> MultiSlots;
 	TArray<bool> MultiLanded;
 	bool bMulti = false;
+	int32 LastCount = 1;
+	TWeakObjectPtr<AActor> ReturnViewTarget;
+	void ClearRevealCoins();
+	FVector EmergePoint(int32 Index, int32 Count, const FVector& Right) const;
+	void SetFountainGlow(float Amount, const FLinearColor& Color);
+	void TickLegend(APlayerController* PC);
+	bool IsLegendWin() const;
+
+	UPROPERTY() TObjectPtr<UStaticMeshComponent> LegendBeam;
+	UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> BeamMID;
+	UPROPERTY() TObjectPtr<AFortuneCoinPreview> LegendCoin;
+	float NextFxTime = 0.f;
+	float StageBaseFOV = 0.f;
+	bool bHasFlyStart = false;
+	FVector FlyStart = FVector::ZeroVector;
 	int32 BestIndex = 0;
 	float BurstTime = -1.f;
 

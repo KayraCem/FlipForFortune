@@ -152,7 +152,7 @@ void UFortuneCoinAuraComponent::SetAura(EFortuneCoinAura InAura, const FLinearCo
 		MakeISM(SphereMesh, Color, true, 2.2f, true);                                  // dis alev
 		MakeISM(SphereMesh, FLinearColor(1.f, 0.75f, 0.3f), true, 3.f, true);         // sicak cekirdek
 		MakeISM(SphereMesh, FLinearColor(1.f, 0.55f, 0.15f), true, 6.f, true);        // korlar
-		const int32 Counts[3] = { 26, 16, 12 };
+		const int32 Counts[3] = { 38, 24, 16 };
 		for (int32 g = 0; g < 3; ++g)
 		{
 			Flames[g].SetNum(Counts[g]);
@@ -162,9 +162,93 @@ void UFortuneCoinAuraComponent::SetAura(EFortuneCoinAura InAura, const FLinearCo
 				Groups[g]->AddInstance(FTransform(FQuat::Identity, F.Pos, FVector::ZeroVector), false);
 			}
 		}
-		AddLight(FLinearColor(1.f, 0.45f, 0.12f), 900.f, 45.f);
+		AddLight(FLinearColor(1.f, 0.45f, 0.12f), 1400.f, 55.f);
 		break;
 	}
+	case EFortuneCoinAura::EyeFlames:
+	{
+		// Kafatasinin goz cukurlarindan mor alev: dis alev, sicak cekirdek, kivilcim (dunya uzayi, ucarken iz birakir)
+		if (UMaterialInterface* Fire = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/FlipForFortune/Materials/M_FX_Fire.M_FX_Fire"), nullptr, LOAD_NoWarn | LOAD_Quiet))
+		{
+			GlowMaterial = Fire;
+		}
+		MakeISM(SphereMesh, Color, true, 3.f, true);
+		MakeISM(SphereMesh, FLinearColor(1.f, 0.7f, 1.f), true, 5.f, true);
+		MakeISM(SphereMesh, FLinearColor(0.85f, 0.4f, 1.f), true, 8.f, true);
+		const int32 Counts[3] = { 22, 14, 10 };
+		for (int32 g = 0; g < 3; ++g)
+		{
+			Flames[g].SetNum(Counts[g]);
+			for (FFlame& F : Flames[g])
+			{
+				RespawnFlame(F, g, true);
+				Groups[g]->AddInstance(FTransform(FQuat::Identity, F.Pos, FVector::ZeroVector), false);
+			}
+		}
+		GlowMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/FlipForFortune/Materials/M_FX_Glow.M_FX_Glow"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+		// Kafatasinin arkasindan capraz cikan iki korsan kilici (pala)
+		{
+			UInstancedStaticMeshComponent* Blade = MakeISM(CubeMesh, FLinearColor(0.78f, 0.8f, 0.84f), false, 0.f, false);
+			UInstancedStaticMeshComponent* Guard = MakeISM(CubeMesh, FLinearColor(0.95f, 0.68f, 0.2f), false, 0.f, false);
+			UInstancedStaticMeshComponent* Grip = MakeISM(CylMesh ? CylMesh.Get() : CubeMesh.Get(), FLinearColor(0.18f, 0.08f, 0.03f), false, 0.f, false, true);
+			for (float Deg : { 40.f, -40.f })
+			{
+				const float Sg = Deg > 0.f ? 1.f : -1.f;
+				const float A = FMath::DegreesToRadians(180.f + Deg);   // kabza asagida, uc yukarida
+				const FVector Dir(-FMath::Cos(A), -FMath::Sin(A), 0.f);  // kabzadan uca
+				const FVector Side(-Dir.Y, Dir.X, 0.f);
+				const float Z = -Half - 0.25f - (Sg > 0.f ? 0.f : 0.12f);
+				const FVector Hilt = -Dir * (Radius * 1.05f) + FVector(0.f, 0.f, Z);
+				// Kavisli bicak: 6 parca, uca dogru incelir ve kivrilir
+				FVector P = Hilt + Dir * 0.35f;
+				FVector D = Dir;
+				for (int32 k = 0; k < 6; ++k)
+				{
+					const float L = Radius * 0.42f;
+					const float W = 0.55f - k * 0.06f;
+					Blade->AddInstance(AuraBox(P + D * L * 0.5f, D, Side, FVector(L * 1.05f, W, 0.08f)), false);
+					P += D * L;
+					D = (D + Side * Sg * 0.07f).GetSafeNormal();
+				}
+				Guard->AddInstance(AuraBox(Hilt + Dir * 0.3f, Side, Dir, FVector(1.5f, 0.26f, 0.26f)), false);
+				Guard->AddInstance(AuraBox(Hilt + Dir * 0.3f + Side * 0.7f - Dir * 0.35f, Dir, Side, FVector(0.8f, 0.18f, 0.18f)), false);
+				Grip->AddInstance(FTransform(FRotationMatrix::MakeFromZ(-Dir).ToQuat(), Hilt - Dir * 0.55f, FVector(0.3f, 0.3f, 1.1f) * AuraCm), false);
+				Guard->AddInstance(AuraBox(Hilt - Dir * 1.15f, Dir, Side, FVector(0.4f, 0.4f, 0.4f)), false);
+			}
+		}
+		AddLight(Color, 900.f, 40.f);
+		break;
+	}
+	case EFortuneCoinAura::Pages:
+	{
+		// Ustte spiral cilt halkalari (altin) + kopup ucan takvim yapraklari
+		UInstancedStaticMeshComponent* Rings = MakeISM(SphereMesh, FLinearColor(0.95f, 0.7f, 0.25f), false, 0.f, false);
+		MakeISM(CubeMesh, FLinearColor(0.93f, 0.89f, 0.76f), false, 0.f, false, true);   // sayfalar
+		MakeISM(CubeMesh, FLinearColor(0.7f, 0.08f, 0.1f), false, 0.f, false, true);     // sayfa ust seridi (kirmizi)
+		if (Rings)
+		{
+			for (int32 r = 0; r < 6; ++r)
+			{
+				const float Y = (-0.5f + r / 5.f) * Radius * 0.95f;
+				for (int32 k = 0; k < 9; ++k)
+				{
+					// Kenarin uzerinden iki yuze sarilan kucuk halka
+					const float A = PI * (k / 8.f) - PI * 0.5f;
+					const FVector P(Radius * 0.86f + FMath::Cos(A) * 0.42f, Y, FMath::Sin(A) * (Half + 0.25f));
+					Rings->AddInstance(FTransform(FQuat::Identity, P, FVector(0.13f) * AuraCm), false);
+				}
+			}
+		}
+		for (int32 i = 0; i < 3; ++i)
+		{
+			Groups[1]->AddInstance(FTransform::Identity, false);
+			Groups[2]->AddInstance(FTransform::Identity, false);
+		}
+		break;
+	}
+	case EFortuneCoinAura::RoseBloom:
+		BuildRose();
+		break;
 	case EFortuneCoinAura::Chains:
 		BuildChains();
 		break;
@@ -196,13 +280,21 @@ void UFortuneCoinAuraComponent::SetAura(EFortuneCoinAura InAura, const FLinearCo
 	}
 	case EFortuneCoinAura::Sparkle:
 	{
-		UInstancedStaticMeshComponent* Spark = MakeISM(CubeMesh, Color, true, 20.f, false);
-		for (int32 i = 0; i < 12; ++i)
+		// Parilti yildizi: iki uzun sivri isin (+), iki kisa capraz isin (x), parlak cekirdek
+		MakeISM(SphereMesh, Color, true, 16.f, false);
+		MakeISM(SphereMesh, FMath::Lerp(Color, FLinearColor::White, 0.6f), true, 22.f, false);
+		MakeISM(SphereMesh, FLinearColor::White, true, 30.f, false);
+		for (int32 i = 0; i < 14; ++i)
 		{
-			Spark->AddInstance(FTransform::Identity, false);
-			Spark->AddInstance(FTransform::Identity, false);
-			SparkSeeds.Add(FVector(FMath::FRand(), FMath::FRand(), FMath::FRandRange(0.7f, 1.6f)));
+			for (int32 k = 0; k < 2; ++k)
+			{
+				Groups[0]->AddInstance(FTransform::Identity, false);
+				Groups[1]->AddInstance(FTransform::Identity, false);
+			}
+			Groups[2]->AddInstance(FTransform::Identity, false);
+			SparkSeeds.Add(FVector(FMath::FRand(), FMath::FRand(), FMath::FRandRange(0.7f, 1.5f)));
 		}
+		AddLight(Color, 200.f, 25.f);
 		break;
 	}
 	case EFortuneCoinAura::Thorns:
@@ -251,9 +343,11 @@ void UFortuneCoinAuraComponent::SetAura(EFortuneCoinAura InAura, const FLinearCo
 	case EFortuneCoinAura::Bones: BuildBones(); break;
 	case EFortuneCoinAura::Wings:
 	{
-		MakeISM(CubeMesh, FLinearColor(0.95f, 0.94f, 0.9f), false, 0.f, false, true);   // tuyler
-		MakeISM(CubeMesh, Color, true, 6.f, false);                                      // hale
-		for (int32 i = 0; i < 2 * 7; ++i) Groups[0]->AddInstance(FTransform::Identity, false);
+		MakeISM(SphereMesh, FLinearColor(0.96f, 0.95f, 0.92f), false, 0.f, false, true);  // tuyler (yumusak elips)
+		MakeISM(CubeMesh, Color, true, 6.f, false);                                       // hale
+		MakeISM(SphereMesh, FLinearColor(0.98f, 0.82f, 0.4f), false, 0.f, false, true);   // altin tuy uclari
+		for (int32 i = 0; i < 2 * 21; ++i) Groups[0]->AddInstance(FTransform::Identity, false);
+		for (int32 i = 0; i < 2 * 8; ++i) Groups[2]->AddInstance(FTransform::Identity, false);
 		for (int32 i = 0; i < 24; ++i) Groups[1]->AddInstance(FTransform::Identity, false);
 		AddLight(Color, 250.f, 25.f);
 		break;
@@ -390,6 +484,24 @@ void UFortuneCoinAuraComponent::RespawnFlame(FFlame& F, int32 Group, bool bRando
 {
 	const FTransform& X = GetComponentTransform();
 	const float S = X.GetScale3D().GetAbsMax();
+	if (Aura == EFortuneCoinAura::EyeFlames)
+	{
+		// Yazi yuzundeki iki goz cukuru (doku: merkezden +/-0.31R yanda, hafif yukarida)
+		const float E = FMath::RandBool() ? 1.f : -1.f;
+		const FVector Eye(0.05f * Radius + FMath::FRandRange(-0.18f, 0.18f), E * 0.31f * Radius + FMath::FRandRange(-0.18f, 0.18f), Half + 0.05f);
+		F.Pos = X.TransformPosition(Eye);
+		const FVector Out = X.TransformVectorNoScale(FVector::UpVector);     // yuzden disari
+		const FVector CoinUp = X.TransformVectorNoScale(FVector::ForwardVector);
+		switch (Group)
+		{
+		case 0: F.Life = FMath::FRandRange(0.4f, 0.7f); F.Size = FMath::FRandRange(0.6f, 1.0f); F.Vel = (Out * 3.f + CoinUp * 2.5f + FVector::UpVector * 3.f) * S; break;
+		case 1: F.Life = FMath::FRandRange(0.25f, 0.45f); F.Size = FMath::FRandRange(0.35f, 0.6f); F.Vel = (Out * 2.f + CoinUp * 2.f + FVector::UpVector * 2.f) * S; break;
+		default: F.Life = FMath::FRandRange(0.7f, 1.3f); F.Size = FMath::FRandRange(0.1f, 0.18f); F.Vel = (Out * FMath::FRandRange(3.f, 7.f) + FVector::UpVector * 6.f) * S; break;
+		}
+		F.Phase = FMath::FRandRange(0.f, 2.f * PI);
+		F.Age = bRandomAge ? FMath::FRandRange(0.f, F.Life) : 0.f;
+		return;
+	}
 	const float A = FMath::FRandRange(0.f, 2.f * PI);
 	const FVector Radial(FMath::Cos(A), FMath::Sin(A), 0.f);
 	const float R = Group == 2 ? FMath::FRandRange(0.3f, 1.f) * Radius : Radius * FMath::FRandRange(0.88f, 1.0f);
@@ -401,17 +513,17 @@ void UFortuneCoinAuraComponent::RespawnFlame(FFlame& F, int32 Group, bool bRando
 	{
 	case 0:
 		F.Life = FMath::FRandRange(0.45f, 0.8f);
-		F.Size = FMath::FRandRange(1.0f, 1.6f);
+		F.Size = FMath::FRandRange(1.5f, 2.4f);
 		F.Vel = (FVector::UpVector * FMath::FRandRange(4.f, 8.f) + Out * 1.2f) * S;
 		break;
 	case 1:
 		F.Life = FMath::FRandRange(0.28f, 0.5f);
-		F.Size = FMath::FRandRange(0.55f, 0.9f);
+		F.Size = FMath::FRandRange(0.9f, 1.4f);
 		F.Vel = (FVector::UpVector * FMath::FRandRange(3.f, 6.f) + Out * 0.6f) * S;
 		break;
 	default:
 		F.Life = FMath::FRandRange(0.8f, 1.5f);
-		F.Size = FMath::FRandRange(0.14f, 0.26f);
+		F.Size = FMath::FRandRange(0.2f, 0.35f);
 		F.Vel = (FVector::UpVector * FMath::FRandRange(8.f, 14.f) + Out * FMath::FRandRange(0.5f, 2.5f)) * S;
 		break;
 	}
@@ -459,11 +571,14 @@ void UFortuneCoinAuraComponent::TickFire(float Dt)
 
 void UFortuneCoinAuraComponent::TickLocal(float Dt)
 {
-	if (Aura == EFortuneCoinAura::Fire)
+	if (Aura == EFortuneCoinAura::Fire || Aura == EFortuneCoinAura::EyeFlames)
 	{
 		TickFire(Dt);
 		return;
 	}
+	if (Aura == EFortuneCoinAura::Sparkle)   { TickSparkle();  return; }
+	if (Aura == EFortuneCoinAura::Pages)     { TickPages();    return; }
+	if (Aura == EFortuneCoinAura::RoseBloom) { TickRose(Dt);   return; }
 	if (Aura == EFortuneCoinAura::Kelp)
 	{
 		TickKelp();
@@ -785,32 +900,37 @@ void UFortuneCoinAuraComponent::BuildBolts()
 
 void UFortuneCoinAuraComponent::BuildStem()
 {
-	UInstancedStaticMeshComponent* Stem = MakeISM(CubeMesh, FLinearColor(0.22f, 0.32f, 0.08f), false, 0.f, false, true);
-	UInstancedStaticMeshComponent* Leaf = MakeISM(CubeMesh, FLinearColor(0.12f, 0.45f, 0.1f), false, 0.f, false, true);
-	UInstancedStaticMeshComponent* Curl = MakeISM(SphereMesh, FLinearColor(0.18f, 0.4f, 0.08f), false, 0.f, false, true);
+	UInstancedStaticMeshComponent* Stem = MakeISM(CylMesh ? CylMesh.Get() : CubeMesh.Get(), FLinearColor(0.12f, 0.15f, 0.045f), false, 0.f, false, true);
+	UInstancedStaticMeshComponent* Leaf = MakeISM(SphereMesh, FLinearColor(0.06f, 0.2f, 0.05f), false, 0.f, false, true);
+	UInstancedStaticMeshComponent* Curl = MakeISM(SphereMesh, FLinearColor(0.09f, 0.18f, 0.045f), false, 0.f, false, true);
 	if (!Stem || !Leaf || !Curl) return;
 	const FVector X = FVector::ForwardVector;   // coinin ustu (+X)
-	// Kalin, hafif egik sap: 3 parca
-	FVector P = X * (Radius * 0.9f);
+	// Balkabagi seklinin ust cukuru ~0.72R: sap coinin icinden baslar (bosluk kalmaz)
+	FVector P = X * (Radius * 0.62f);
 	FVector D = X;
-	for (int32 k = 0; k < 3; ++k)
+	for (int32 k = 0; k < 4; ++k)
 	{
-		D = (D + FVector(0.f, 0.18f, 0.05f)).GetSafeNormal();
-		const float L = 0.55f;
-		Stem->AddInstance(AuraBox(P + D * L * 0.5f, D, FVector::RightVector, FVector(L * 1.1f, 0.5f - k * 0.08f, 0.5f - k * 0.08f)), false);
+		D = (D + FVector(0.f, 0.14f, 0.03f)).GetSafeNormal();
+		const float L = 0.5f;
+		const float Rr = 0.36f - k * 0.05f;
+		Stem->AddInstance(FTransform(FRotationMatrix::MakeFromZ(D).ToQuat(), P + D * L * 0.5f, FVector(Rr * 2.f, Rr * 2.f, L * 1.15f) * AuraCm), false);
 		P += D * L;
 	}
-	// Yaprak
-	Leaf->AddInstance(AuraBox(X * (Radius + 0.3f) + FVector(0.f, -0.9f, 0.15f), FVector(0.3f, -1.f, 0.f).GetSafeNormal(), FVector(1.f, 0.3f, 0.f).GetSafeNormal(), FVector(1.4f, 0.8f, 0.07f)), false);
-	Leaf->AddInstance(AuraBox(X * (Radius + 0.3f) + FVector(0.f, -0.9f, 0.18f), FVector(0.3f, -1.f, 0.f).GetSafeNormal(), FVector(1.f, 0.3f, 0.f).GetSafeNormal(), FVector(1.0f, 0.12f, 0.1f)), false);
+	// Sap ucunda kesik (biraz kalin)
+	Stem->AddInstance(FTransform(FRotationMatrix::MakeFromZ(D).ToQuat(), P, FVector(0.5f, 0.5f, 0.12f) * AuraCm), false);
+	// Iki yaprak: yassi elips, cukura dogru egik
+	Leaf->AddInstance(FTransform(FRotationMatrix::MakeFromXY(FVector(0.35f, -1.f, 0.f).GetSafeNormal(), FVector(1.f, 0.35f, 0.f).GetSafeNormal()).ToQuat(),
+		X * (Radius * 0.8f) + FVector(0.f, -0.9f, 0.12f), FVector(1.5f, 0.75f, 0.1f) * AuraCm), false);
+	Leaf->AddInstance(FTransform(FRotationMatrix::MakeFromXY(FVector(0.2f, 1.f, 0.f).GetSafeNormal(), FVector(-1.f, 0.2f, 0.f).GetSafeNormal()).ToQuat(),
+		X * (Radius * 0.82f) + FVector(0.f, 0.75f, -0.1f), FVector(1.1f, 0.55f, 0.09f) * AuraCm), false);
 	// Kivrik dal (spiral)
-	for (int32 i = 0; i < 14; ++i)
+	for (int32 i = 0; i < 18; ++i)
 	{
-		const float T = i / 13.f;
+		const float T = i / 17.f;
 		const float A = T * 3.5f * PI;
-		const float Rr = 0.55f * (1.f - T * 0.6f);
-		const FVector C = X * (Radius + 0.4f) + FVector(FMath::Sin(A) * Rr, 0.7f + FMath::Cos(A) * Rr, 0.f);
-		Curl->AddInstance(FTransform(FQuat::Identity, C, FVector(0.14f) * AuraCm), false);
+		const float Rr = 0.5f * (1.f - T * 0.6f);
+		const FVector C = X * (Radius * 0.86f) + FVector(FMath::Sin(A) * Rr, 1.25f + FMath::Cos(A) * Rr, 0.f);
+		Curl->AddInstance(FTransform(FQuat::Identity, C, FVector(0.12f) * AuraCm), false);
 	}
 }
 
@@ -843,25 +963,46 @@ void UFortuneCoinAuraComponent::BuildBones()
 
 void UFortuneCoinAuraComponent::TickWings()
 {
-	if (Groups.Num() < 2) return;
-	TArray<FTransform> Xs;
-	const float Flap = FMath::Sin(Time * 2.2f) * 12.f;
+	if (Groups.Num() < 3) return;
+	TArray<FTransform> Xs, Tips;
+	// Cirpma: kanatlar mentese ekseni (coinin ustu, +X) etrafinda one/arkaya acilip kapanir
+	const float Beat = FMath::Sin(Time * 3.4f);
+	const float Flap = FMath::DegreesToRadians(18.f + 30.f * Beat);
+	const float Spread = 0.92f + 0.08f * Beat;
+	struct FRow { int32 Count; float A0; float A1; float L0; float L1; float W; float Base; float Lift; };
+	// birincil (uzun, ustte), ikincil (orta), ortu tuyleri (kisa, kok)
+	const FRow Rows[3] = { {8, 18.f, 84.f, 3.0f, 4.6f, 0.62f, 1.25f, 0.06f}, {7, -22.f, 30.f, 2.1f, 3.0f, 0.6f, 0.75f, 0.12f}, {6, -10.f, 70.f, 1.1f, 1.6f, 0.55f, 0.3f, 0.18f} };
 	for (int32 W = 0; W < 2; ++W)
 	{
-		const float S = W == 0 ? 1.f : -1.f;   // +Y / -Y yan
-		const FVector Root(0.4f, S * (Radius * 0.85f), -0.15f);
-		for (int32 f = 0; f < 7; ++f)
+		const float S = W == 0 ? 1.f : -1.f;                    // +Y / -Y yan
+		const FVector Root(0.35f * Radius, S * Radius * 0.9f, 0.f);
+		const FQuat FlapQ(FVector::ForwardVector, -S * Flap);   // mentese: coinin ustu
+		for (int32 r = 0; r < 3; ++r)
 		{
-			// tuyler yelpaze gibi yukari-disa acilir, en usttekiler en uzun
-			const float Ang = FMath::DegreesToRadians(-35.f + f * 17.f);
-			const float Back = FMath::DegreesToRadians(15.f + Flap);
-			const FVector Dir = FVector(FMath::Sin(Ang), S * FMath::Cos(Ang) * FMath::Cos(Back), -FMath::Sin(Back) * 0.6f).GetSafeNormal();
-			const float L = 1.4f + 0.35f * f;
-			const FVector Sd = FVector::CrossProduct(Dir, FVector::UpVector).GetSafeNormal();
-			Xs.Add(AuraBox(Root + Dir * L * 0.5f, Dir, Sd, FVector(L, 0.42f, 0.09f)));
+			const FRow& R = Rows[r];
+			for (int32 f = 0; f < R.Count; ++f)
+			{
+				const float T = R.Count > 1 ? f / float(R.Count - 1) : 0.f;
+				const float Ang = FMath::DegreesToRadians(FMath::Lerp(R.A0, R.A1, T) * Spread);
+				// kanat duzleminde (disa = S*Y, yukari = +X)
+				const FVector Dir0(FMath::Sin(Ang), S * FMath::Cos(Ang), 0.f);
+				const float L = FMath::Lerp(R.L0, R.L1, FMath::Sin(T * PI * 0.5f));
+				const FVector Bone0 = FVector(Dir0.X * 0.2f, Dir0.Y * 0.2f, 0.f) * R.Base;
+				FVector C0 = Bone0 + Dir0 * (L * 0.5f) + FVector(0.f, 0.f, -R.Lift - 0.03f * f);
+				const FVector Dir = FlapQ.RotateVector(Dir0);
+				const FVector C = Root + FlapQ.RotateVector(C0);
+				const FVector Nrm = FlapQ.RotateVector(FVector::UpVector);
+				const FVector Side = FVector::CrossProduct(Nrm, Dir).GetSafeNormal();
+				Xs.Add(FTransform(FRotationMatrix::MakeFromXY(Dir, Side).ToQuat(), C, FVector(L, R.W, 0.14f) * AuraCm));
+				if (r == 0)
+				{
+					Tips.Add(FTransform(FRotationMatrix::MakeFromXY(Dir, Side).ToQuat(), C + Dir * (L * 0.42f), FVector(L * 0.22f, R.W * 0.7f, 0.16f) * AuraCm));
+				}
+			}
 		}
 	}
 	Groups[0]->BatchUpdateInstancesTransforms(0, Xs, false, true, true);
+	Groups[2]->BatchUpdateInstancesTransforms(0, Tips, false, true, true);
 
 	// Hale: coinin tepesinde (+X) yatay donen isik halkasi
 	Xs.Reset();
@@ -949,4 +1090,206 @@ void UFortuneCoinAuraComponent::TickVault()
 	}
 	Xs.Add(FTransform(FQuat::Identity, FVector(0.f, 0.f, Half + 0.5f), FVector(0.5f, 0.5f, 0.3f) * AuraCm));
 	Groups[1]->BatchUpdateInstancesTransforms(0, Xs, false, true, true);
+}
+
+// ---------------- Parilti yildizlari (+ isareti) ----------------
+
+void UFortuneCoinAuraComponent::TickSparkle()
+{
+	if (Groups.Num() < 3) return;
+	TArray<FTransform> Long, Short, Core;
+	for (int32 i = 0; i < SparkSeeds.Num(); ++i)
+	{
+		const FVector& Sd = SparkSeeds[i];
+		const float Cyc = Time * 0.6f * Sd.Z + Sd.X * 5.f;
+		const int32 Gen = FMath::FloorToInt32(Cyc);
+		const float T = Cyc - Gen;
+		const uint32 H = (uint32(i + 1) * 2654435761u) ^ (uint32(Gen) * 40503u + 0x9e3779b9u);
+		FRandomStream Rs(int32(H & 0x7fffffff));
+		const float A = Rs.FRandRange(0.f, 2.f * PI);
+		const bool bEdge = Rs.FRand() < 0.35f;                    // bazilari kenarda, coinin disinda parlar
+		const float Rr = bEdge ? Radius * Rs.FRandRange(1.0f, 1.25f) : Radius * FMath::Sqrt(Rs.FRand()) * 0.85f;
+		const float Side = Rs.FRand() < 0.5f ? 1.f : -1.f;
+		const FVector P(FMath::Cos(A) * Rr, FMath::Sin(A) * Rr, bEdge ? Rs.FRandRange(-Half, Half) : Side * (Half + 0.15f));
+		// Hizli parlar, yavas soner + kucuk bir sicrama
+		const float Tw = T < 0.25f ? FMath::Sin(T / 0.25f * PI * 0.5f) : FMath::Pow(1.f - (T - 0.25f) / 0.75f, 2.f);
+		const float L = (1.4f + 0.8f * Rs.FRand()) * Tw;
+		const float Rot = Rs.FRandRange(0.f, PI) + T * 0.8f;
+		const FVector N = bEdge ? FVector(FMath::Cos(A), FMath::Sin(A), 0.f) : FVector(0.f, 0.f, Side);
+		FVector U = FVector::CrossProduct(N, FVector(0.31f, 0.77f, 0.55f)).GetSafeNormal();
+		const FVector V0 = FVector::CrossProduct(N, U);
+		const FVector U1 = U * FMath::Cos(Rot) + V0 * FMath::Sin(Rot);
+		const FVector V1 = FVector::CrossProduct(N, U1);
+		const FVector Lift = N * (0.4f * T);
+		Long.Add(FTransform(FRotationMatrix::MakeFromXY(U1, V1).ToQuat(), P + Lift, FVector(L, 0.07f + 0.05f * Tw, 0.07f) * AuraCm));
+		Long.Add(FTransform(FRotationMatrix::MakeFromXY(V1, U1).ToQuat(), P + Lift, FVector(L, 0.07f + 0.05f * Tw, 0.07f) * AuraCm));
+		const FVector D1 = (U1 + V1).GetSafeNormal(), D2 = (U1 - V1).GetSafeNormal();
+		Short.Add(FTransform(FRotationMatrix::MakeFromXY(D1, D2).ToQuat(), P + Lift, FVector(L * 0.45f, 0.05f, 0.05f) * AuraCm));
+		Short.Add(FTransform(FRotationMatrix::MakeFromXY(D2, D1).ToQuat(), P + Lift, FVector(L * 0.45f, 0.05f, 0.05f) * AuraCm));
+		Core.Add(FTransform(FQuat::Identity, P + Lift, FVector(0.28f * Tw) * AuraCm));
+	}
+	Groups[0]->BatchUpdateInstancesTransforms(0, Long, false, true, true);
+	Groups[1]->BatchUpdateInstancesTransforms(0, Short, false, true, true);
+	Groups[2]->BatchUpdateInstancesTransforms(0, Core, false, true, true);
+	if (Light) Light->SetIntensity(LightBase * (0.7f + 0.3f * FMath::Sin(Time * 5.f)));
+}
+
+// ---------------- Takvim: kopup ucan sayfalar ----------------
+
+void UFortuneCoinAuraComponent::TickPages()
+{
+	if (Groups.Num() < 3) return;
+	TArray<FTransform> Pg, Hd;
+	const float Period = 3.f;
+	const FVector Hinge(Radius * 0.74f, 0.f, Half + 0.04f);    // sayfanin ust kenari (spiral halkalarin alti)
+	const float PW = Radius * 1.05f, PH = Radius * 1.25f;
+	for (int32 i = 0; i < 3; ++i)
+	{
+		const float T = FMath::Fmod(Time / Period + i / 3.f, 1.f);
+		FQuat Q = FQuat::Identity;
+		FVector Off = FVector::ZeroVector;
+		float Sc = 1.f;
+		if (T < 0.2f)
+		{
+			// yuzde yatiyor
+		}
+		else if (T < 0.55f)
+		{
+			// ust kenardan kalkip arkaya dogru katlanir
+			const float E = (T - 0.2f) / 0.35f;
+			Q = FQuat(FVector::RightVector, -FMath::DegreesToRadians(150.f * FMath::InterpEaseInOut(0.f, 1.f, E, 2.f)));
+		}
+		else
+		{
+			// kopar, donerek ucar ve kuculur
+			const float E = (T - 0.55f) / 0.45f;
+			Q = FQuat(FVector::RightVector, -FMath::DegreesToRadians(150.f + 260.f * E)) * FQuat(FVector::ForwardVector, E * 2.2f);
+			Off = FVector(Radius * 1.6f * E, (i - 1) * Radius * 0.9f * E, Radius * 1.2f * E * (1.f - E) + 0.8f * E);
+			Sc = 1.f - E;
+		}
+		const FVector PageCenterLocal(-PH * 0.5f, 0.f, 0.f);       // mentese -> sayfa merkezi (asagi dogru)
+		const FVector C = Hinge + Off + Q.RotateVector(PageCenterLocal);
+		Pg.Add(FTransform(Q, C + FVector(0.f, 0.f, 0.01f * i), FVector(PH, PW, 0.025f) * Sc * AuraCm));
+		const FVector HC = Hinge + Off + Q.RotateVector(FVector(-PH * 0.1f, 0.f, 0.02f));
+		Hd.Add(FTransform(Q, HC + FVector(0.f, 0.f, 0.01f * i), FVector(PH * 0.2f, PW, 0.03f) * Sc * AuraCm));
+	}
+	Groups[1]->BatchUpdateInstancesTransforms(0, Pg, false, true, true);
+	Groups[2]->BatchUpdateInstancesTransforms(0, Hd, false, true, true);
+}
+
+// ---------------- Siyah gul: yumusak yapraklar + sarmasik + dokulen yapraklar ----------------
+
+void UFortuneCoinAuraComponent::BuildVines(bool bLeaves)
+{
+	UInstancedStaticMeshComponent* Vine = MakeISM(CylMesh ? CylMesh.Get() : CubeMesh.Get(), FLinearColor(0.03f, 0.12f, 0.03f), false, 0.f, false, true);
+	UInstancedStaticMeshComponent* Thorn = MakeISM(ConeMesh ? ConeMesh.Get() : CubeMesh.Get(), FLinearColor(0.05f, 0.16f, 0.04f), false, 0.f, false, true);
+	UInstancedStaticMeshComponent* Leaf = MakeISM(SphereMesh, FLinearColor(0.03f, 0.18f, 0.04f), false, 0.f, false, true);
+	if (!Vine || !Thorn || !Leaf) return;
+	const FVector Up = FVector::UpVector;
+	FRandomStream Rs(4242);
+	for (int32 v = 0; v < 2; ++v)
+	{
+		const int32 N = 48;
+		const float Ph = v * 1.7f;
+		auto Pt = [&](int32 i)
+		{
+			const float A = 2.f * PI * i / N;
+			const float R = Radius + 0.4f + 0.16f * FMath::Sin(5.f * A + Ph);
+			const float Z = (v == 0 ? 1.f : -1.f) * 0.36f * FMath::Sin(3.f * A + Ph);
+			return FVector(FMath::Cos(A) * R, FMath::Sin(A) * R, Z);
+		};
+		for (int32 i = 0; i < N; ++i)
+		{
+			const FVector P0 = Pt(i), P1 = Pt(i + 1);
+			const FVector Dir = (P1 - P0).GetSafeNormal();
+			const FVector Radial = FVector(P0.X, P0.Y, 0.f).GetSafeNormal();
+			const float Len = (P1 - P0).Size() * 1.2f;
+			Vine->AddInstance(FTransform(FRotationMatrix::MakeFromZ(Dir).ToQuat(), (P0 + P1) * 0.5f, FVector(0.2f, 0.2f, Len) * AuraCm), false);
+			if (i % 3 == v)
+			{
+				const FVector TD = (Radial * 0.8f + Up * Rs.FRandRange(-0.7f, 0.7f) + Dir * 0.3f).GetSafeNormal();
+				Thorn->AddInstance(FTransform(FRotationMatrix::MakeFromZ(TD).ToQuat(), P0 + TD * 0.24f, FVector(0.15f, 0.15f, 0.5f) * AuraCm), false);
+			}
+			if (bLeaves && i % 8 == 3 + v)
+			{
+				const FVector LD = (Radial + Up * (v == 0 ? 0.5f : -0.5f)).GetSafeNormal();
+				Leaf->AddInstance(FTransform(FRotationMatrix::MakeFromXY(LD, Dir).ToQuat(), P0 + LD * 0.5f, FVector(1.0f, 0.5f, 0.08f) * AuraCm), false);
+			}
+		}
+	}
+}
+
+void UFortuneCoinAuraComponent::BuildRose()
+{
+	BuildVines(true);
+	// 3D gul (yazi yuzunun ortasinda, dokudaki gulun ustunde): yumusak elips yapraklar, ice dogru dikleserek
+	UInstancedStaticMeshComponent* PetalA = MakeISM(SphereMesh, FLinearColor(0.07f, 0.0f, 0.012f), false, 0.f, false, true);
+	UInstancedStaticMeshComponent* PetalB = MakeISM(SphereMesh, FLinearColor(0.16f, 0.005f, 0.03f), false, 0.f, false, true);
+	if (!PetalA || !PetalB) return;
+	const FVector Up = FVector::UpVector;
+	const FVector Cen(-0.06f * Radius, 0.f, Half);
+	struct FRing { int32 Count; float R; float Len; float Wid; float Tilt; float Z; };
+	const FRing Rings[] = { {6, 0.95f, 1.2f, 0.95f, 14.f, 0.1f}, {6, 0.72f, 1.0f, 0.85f, 32.f, 0.25f}, {5, 0.5f, 0.82f, 0.7f, 50.f, 0.42f}, {4, 0.3f, 0.62f, 0.55f, 66.f, 0.6f}, {3, 0.14f, 0.45f, 0.42f, 78.f, 0.75f} };
+	FRandomStream Rs(777);
+	for (int32 k = 0; k < 5; ++k)
+	{
+		const FRing& R = Rings[k];
+		for (int32 j = 0; j < R.Count; ++j)
+		{
+			const float A = 2.f * PI * j / R.Count + k * 0.6f;
+			const FVector Rd(FMath::Cos(A), FMath::Sin(A), 0.f);
+			const FVector Td(-Rd.Y, Rd.X, 0.f);
+			const float T = FMath::DegreesToRadians(R.Tilt + Rs.FRandRange(-5.f, 5.f));
+			const FVector X = (Rd * FMath::Cos(T) + Up * FMath::Sin(T)).GetSafeNormal();
+			const FVector Base = Cen + Rd * R.R * 0.6f + Up * R.Z;
+			UInstancedStaticMeshComponent* P = ((j + k) % 2 == 0) ? PetalA : PetalB;
+			P->AddInstance(FTransform(FRotationMatrix::MakeFromXY(X, Td).ToQuat(), Base + X * R.Len * 0.35f, FVector(R.Len, R.Wid, 0.14f) * AuraCm), false);
+		}
+	}
+	PetalA->AddInstance(FTransform(FRotator(30.f, 40.f, 15.f).Quaternion(), Cen + Up * 0.95f, FVector(0.42f, 0.36f, 0.5f) * AuraCm), false);
+	// Dokulen yapraklar (dunya uzayi, ucarken arkada kalir)
+	PetalGroup = Groups.Num();
+	UInstancedStaticMeshComponent* Fall = MakeISM(SphereMesh, FLinearColor(0.22f, 0.01f, 0.04f), false, 0.f, true, true);
+	if (Fall)
+	{
+		Petals.SetNum(8);
+		for (FFlame& F : Petals)
+		{
+			F.Age = FMath::FRandRange(0.f, 2.5f);
+			F.Life = FMath::FRandRange(2.f, 3.f);
+			F.Pos = GetComponentLocation();
+			Fall->AddInstance(FTransform(FQuat::Identity, F.Pos, FVector::ZeroVector), false);
+		}
+	}
+}
+
+void UFortuneCoinAuraComponent::TickRose(float Dt)
+{
+	if (!Groups.IsValidIndex(PetalGroup)) return;
+	const FTransform& X = GetComponentTransform();
+	const float S = X.GetScale3D().GetAbsMax();
+	TArray<FTransform> Xs;
+	for (int32 i = 0; i < Petals.Num(); ++i)
+	{
+		FFlame& F = Petals[i];
+		F.Age += Dt;
+		if (F.Age >= F.Life)
+		{
+			// Gulden kopar: coinin yuzunden, kenara yakin bir yerden
+			const float A = FMath::FRandRange(0.f, 2.f * PI);
+			F.Pos = X.TransformPosition(FVector(FMath::Cos(A) * Radius * 0.5f, FMath::Sin(A) * Radius * 0.5f, Half + 0.6f));
+			F.Vel = (X.TransformVectorNoScale(FVector(FMath::Cos(A), FMath::Sin(A), 0.6f)) * FMath::FRandRange(2.f, 5.f)) * S;
+			F.Age = 0.f;
+			F.Life = FMath::FRandRange(2.f, 3.f);
+			F.Phase = FMath::FRandRange(0.f, 2.f * PI);
+		}
+		const float T = F.Age / F.Life;
+		F.Vel.Z -= 4.f * S * Dt;
+		F.Vel *= FMath::Max(0.f, 1.f - 1.2f * Dt);
+		F.Pos += (F.Vel + FVector(FMath::Sin(Time * 2.f + F.Phase), FMath::Cos(Time * 1.7f + F.Phase), 0.f) * 1.5f * S) * Dt;
+		const float Sc = S * (T < 0.1f ? T / 0.1f : 1.f - FMath::Max(0.f, (T - 0.7f) / 0.3f));
+		const FQuat Q = FQuat(FRotator(Time * 90.f + F.Phase * 50.f, Time * 60.f + i * 40.f, Time * 120.f + F.Phase * 30.f));
+		Xs.Add(FTransform(Q, F.Pos, FVector(0.7f, 0.5f, 0.07f) * Sc * AuraCm));
+	}
+	Groups[PetalGroup]->BatchUpdateInstancesTransforms(0, Xs, false, true, true);
 }

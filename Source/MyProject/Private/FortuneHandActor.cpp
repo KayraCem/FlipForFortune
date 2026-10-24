@@ -131,7 +131,7 @@ void AFortuneHandActor::BeginPlay()
 void AFortuneHandActor::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
-	LoadSmoothHand();   // editorde de gorunsun
+	// Mesh verisi haritaya kaydedilmesin diye el sadece oyunda (BeginPlay) yuklenir
 }
 
 bool AFortuneHandActor::LoadBinMesh(UProceduralMeshComponent* PMC, const FString& File, const FLinearColor& Color)
@@ -155,7 +155,7 @@ bool AFortuneHandActor::LoadBinMesh(UProceduralMeshComponent* PMC, const FString
 	for (int32 i = 0; i < NV; ++i)
 	{
 		V[i] = FVector(Pos[i * 3], Pos[i * 3 + 1], Pos[i * 3 + 2]);
-		N[i] = FVector(Nrm[i * 3], Nrm[i * 3 + 1], Nrm[i * 3 + 2]);
+		N[i] = -FVector(Nrm[i * 3], Nrm[i * 3 + 1], Nrm[i * 3 + 2]);   // dosyadaki normaller iceri bakiyor -> disari cevir
 	}
 	// Ucgen sirasini ters cevir: UE'de on yuz bu sarimla gorunur (yoksa el iceriden gorunuyordu)
 	TArray<int32> T; T.SetNumUninitialized(NT * 3);

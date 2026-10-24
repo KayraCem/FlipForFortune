@@ -1,4 +1,5 @@
-// Flip for Fortune - Fare imleci acik, esyalara tiklanabilir, Space = coin at.
+// Flip for Fortune - Birinci sahis: WASD yuru, fare ile bak, nisangahla etkilesim, Space = coin at.
+// Menu/panel acikken (veya Alt basiliyken) fare imleci gorunur ve HUD ikonlarina tiklanabilir.
 #pragma once
 
 #include "CoreMinimal.h"
@@ -28,6 +29,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Fortune")
 	bool IsMenuOpen() const { return bMenuOpen; }
 
+	/** Coin Collection ekranini ac/kapat (HUD'daki sol ikon veya C tusu). */
+	UFUNCTION(BlueprintCallable, Category = "Fortune")
+	void ToggleCollection();
+
+	/** Envanteri ac/kapat (HUD'daki sol ikon veya I tusu). */
+	UFUNCTION(BlueprintCallable, Category = "Fortune")
+	void ToggleInventory();
+
 	// ---- TEST komutlari (konsol: ` tusu) ----
 	/** GiveScrolls 10 */
 	UFUNCTION(Exec)
@@ -45,7 +54,11 @@ public:
 	UFUNCTION(Exec)
 	void GiveMoney(double Amount = 1000.0);
 
-	/** Sag tik basili + fare: etrafa bakma hassasiyeti. */
+	/** Fare ile bakma hassasiyeti (derece / fare birimi). */
+	UPROPERTY(EditAnywhere, Category = "Fortune|Camera")
+	float MouseSensitivity = 0.35f;
+
+	/** Karakter yoksa: sag tik basili + fare ile bakma hassasiyeti. */
 	UPROPERTY(EditAnywhere, Category = "Fortune|Camera")
 	float LookSensitivity = 0.6f;
 
@@ -58,6 +71,33 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Fortune|Camera")
 	float MaxLookDown = 25.f;
 
+	/** Birinci sahis: baslangic bakis acisi ve sinirlar (derece). */
+	UPROPERTY(EditAnywhere, Category = "Fortune|Camera")
+	float StartViewPitch = -10.f;
+
+	UPROPERTY(EditAnywhere, Category = "Fortune|Camera")
+	float MinViewPitch = -75.f;
+
+	UPROPERTY(EditAnywhere, Category = "Fortune|Camera")
+	float MaxViewPitch = 70.f;
+
+	/** Kollarin tasarlandigi bakis acisi: bu acida el ekranin altinda durur, kollar bakisi takip eder. */
+	UPROPERTY(EditAnywhere, Category = "Fortune|Camera")
+	float ArmBasePitch = -34.f;
+
+	UPROPERTY(EditAnywhere, Category = "Fortune|Move")
+	float WalkSpeed = 230.f;
+
+	UPROPERTY(EditAnywhere, Category = "Fortune|Move")
+	float RunSpeed = 400.f;
+
+	UPROPERTY(EditAnywhere, Category = "Fortune|Move")
+	float CapsuleRadius = 28.f;
+
+	/** Nisangahla etkilesim mesafesi (cm). */
+	UPROPERTY(EditAnywhere, Category = "Fortune|Move")
+	float InteractDistance = 450.f;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
@@ -68,9 +108,25 @@ private:
 	void AutoFlipPressed();
 	void LookPressed() { bLooking = true; }
 	void LookReleased() { bLooking = false; }
-	void ZoomIn() { TargetFOV = FMath::Clamp(TargetFOV - 4.f, 35.f, 85.f); }
-	void ZoomOut() { TargetFOV = FMath::Clamp(TargetFOV + 4.f, 35.f, 85.f); }
+	void ZoomIn() { TargetFOV = FMath::Clamp(TargetFOV - 4.f, 50.f, 100.f); }
+	void ZoomOut() { TargetFOV = FMath::Clamp(TargetFOV + 4.f, 50.f, 100.f); }
 	void ResetLook() { TargetYaw = 0.f; TargetPitch = 0.f; TargetFOV = BaseFOV; }
+
+	// ---- birinci sahis ----
+	void ClickPressed();     // sol tik: nisangahtaki esya, yoksa coin at
+	void UsePressed();       // E: nisangahtaki esya
+	bool WantsUI() const;
+	void ApplyInputMode(bool bUI);
+	void TickFirstPerson(float DeltaTime);
+	void MoveHero(const FVector& Delta);
+	class AFortuneInteractable* TraceInteractable() const;
+
+	TWeakObjectPtr<class AFortuneHeroActor> Hero;
+	TWeakObjectPtr<class AFortuneInteractable> Hovered;
+	FVector CamRelLoc = FVector::ZeroVector;
+	float HeroYaw = 0.f, ViewPitch = 0.f;
+	float BobTime = 0.f, BobAmount = 0.f;
+	bool bUIMode = true;
 
 	TWeakObjectPtr<class ACameraActor> MainCamera;
 	FRotator BaseRotation = FRotator::ZeroRotator;
@@ -85,4 +141,8 @@ private:
 	TObjectPtr<class UUserWidget> HUDWidget;
 
 	bool bMenuOpen = false;
+private:
+	void TogglePanel(TSubclassOf<UUserWidget> Cls, TWeakObjectPtr<UUserWidget>& Panel);
+	TWeakObjectPtr<UUserWidget> CollectionPanel;
+	TWeakObjectPtr<UUserWidget> InventoryPanel;
 };

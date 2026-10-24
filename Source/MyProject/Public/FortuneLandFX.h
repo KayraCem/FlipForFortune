@@ -23,10 +23,10 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 
 	/** Efekti baslat. Power: 1 = normal, kritikte ~1.6. bHeads false ise biraz soluk. */
-	void Play(EFortuneLandFX Type, float Power, bool bHeads);
+	void Play(EFortuneLandFX Type, float Power, bool bHeads, const FLinearColor& Tint = FLinearColor::Transparent);
 
-	/** Kolay kullanim: dunyada bir noktada efekt olustur. */
-	static void SpawnAt(UWorld* World, const FVector& Location, EFortuneLandFX Type, float Power, bool bHeads);
+	/** Kolay kullanim: dunyada bir noktada efekt olustur. Tint: coinin rengi (halka, isilti, flas). */
+	static void SpawnAt(UWorld* World, const FVector& Location, EFortuneLandFX Type, float Power, bool bHeads, const FLinearColor& Tint = FLinearColor::Transparent);
 
 private:
 	struct FParticle

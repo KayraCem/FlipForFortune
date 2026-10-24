@@ -97,6 +97,79 @@ private:
 	TArray<bool> Affordable;
 };
 
+/** Legendary ve ustu cikinca: ekran parlar, buyuk nadirlik yazisi (kendi kendine kaybolur). */
+UCLASS()
+class MYPROJECT_API UFortuneLegendBannerWidget : public UUserWidget
+{
+	GENERATED_BODY()
+
+public:
+	void Setup(const FString& RarityName, const FLinearColor& Color, const FString& CoinName);
+
+protected:
+	virtual TSharedRef<SWidget> RebuildWidget() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+
+private:
+	UPROPERTY() TObjectPtr<class UImage> Flash;
+	UPROPERTY() TObjectPtr<UTextBlock> BigText;
+	UPROPERTY() TObjectPtr<UTextBlock> SubText;
+	FLinearColor Tint = FLinearColor::White;
+	float Age = 0.f;
+};
+
+/** Summon sahnesinde sag ustte duran para gostergesi (HUD gizliyken). */
+UCLASS()
+class MYPROJECT_API UFortuneMoneyChipWidget : public UUserWidget
+{
+	GENERATED_BODY()
+
+protected:
+	virtual TSharedRef<SWidget> RebuildWidget() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+
+private:
+	UPROPERTY() TObjectPtr<UTextBlock> MoneyText;
+	double Shown = -1.0;
+};
+
+/** Summon sonuc ekraninin altindaki butonlar: TEKRAR xN, x10 (veya x1), TAMAM. */
+UCLASS()
+class MYPROJECT_API UFortuneSummonAgainBar : public UUserWidget
+{
+	GENERATED_BODY()
+
+public:
+	TWeakObjectPtr<AFortuneGachaChest> Chest;
+
+	/** Butonlar bu kadar saniye sonra belirir (yanlislikla basilmasin). */
+	float Delay = 0.8f;
+
+protected:
+	virtual TSharedRef<SWidget> RebuildWidget() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+
+private:
+	void BuildTree();
+	UButton* MakeBarButton(const FString& Label, const FLinearColor& Fill, const FLinearColor& Accent, UTextBlock*& OutText, float Width);
+
+	UFUNCTION() void OnAgain();
+	UFUNCTION() void OnOther();
+	UFUNCTION() void OnOk();
+
+	UPROPERTY() TObjectPtr<UButton> AgainBtn;
+	UPROPERTY() TObjectPtr<UButton> OtherBtn;
+	UPROPERTY() TObjectPtr<UButton> OkBtn;
+	UPROPERTY() TObjectPtr<UTextBlock> AgainText;
+	UPROPERTY() TObjectPtr<UTextBlock> OtherText;
+	UPROPERTY() TObjectPtr<UTextBlock> OkText;
+
+	int32 AgainCount = 1;
+	int32 OtherCount = 10;
+	float Age = 0.f;
+	bool bUsed = false;
+};
+
 /** Coklu summon sonucu: her coinin altinda isim/nadirlik etiketi, en iyisi vurgulu. Tikla -> kapat. */
 UCLASS()
 class MYPROJECT_API UFortuneGachaMultiRevealWidget : public UUserWidget

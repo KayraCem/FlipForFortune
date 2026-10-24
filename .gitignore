@@ -15,3 +15,7 @@ Build/
 *.VC.opendb
 Tools/__pycache__/
 *.pyc
+
+# Unreal assetleri (harita, materyal, dokular): GitHub'a yuklenmez.
+# Hepsi Tools/build_coin_room.py + Tools/decorate_coin_room.py ve Art/ klasorunden yeniden uretilir.
+Content/

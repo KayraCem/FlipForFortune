@@ -56,6 +56,11 @@ private:
 	void TickClock();
 	void TickCompass();
 	void TickVault();
+	void TickSparkle();
+	void TickPages();
+	void TickRose(float Dt);
+	void BuildRose();
+	void BuildVines(bool bLeaves);
 	void TickKelp();
 	void TickZone();
 	void RespawnFlame(FFlame& F, int32 Group, bool bRandomAge);
@@ -97,5 +102,7 @@ private:
 
 	TArray<FFlame> Flames[3];       // 0 dis alev, 1 ic cekirdek, 2 kor
 	TArray<FVector> SparkSeeds;      // isilti / hale icin rastgele degerler
+	TArray<FFlame> Petals;           // dokulen gul yapraklari (dunya)
+	int32 PetalGroup = INDEX_NONE;
 	float LightBase = 0.f;
 };

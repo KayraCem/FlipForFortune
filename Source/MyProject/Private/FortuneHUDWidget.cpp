@@ -18,6 +18,8 @@
 #include "Styling/SlateTypes.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Engine/GameInstance.h"
+#include "Engine/Texture2D.h"
+#include "FortunePlayerController.h"
 
 #define LOCTEXT_NAMESPACE "FortuneHUD"
 
@@ -93,13 +95,55 @@ void UFortuneHUDWidget::BuildTree()
 	// Sol alt: kamera ipucu
 	UTextBlock* Hint = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("CameraHint"));
 	HudStyleText(Hint, 13, FLinearColor(1.f, 1.f, 1.f, 0.55f), false);
-	Hint->SetText(FText::FromString(TEXT("Sağ tık basılı: etrafa bak   •   Tekerlek: yakınlaş   •   R: sıfırla   •   Space: at   •   A: AutoFlip")));
+	Hint->SetText(FText::FromString(TEXT("WASD: yürü   •   Shift: koş   •   Fare: bak   •   Sol tık / E: etkileşim   •   Space: coin at   •   F: AutoFlip   •   Alt basılı: imleç")));
 	Hint->SetVisibility(ESlateVisibility::HitTestInvisible);
 	UCanvasPanelSlot* HintSlot = Root->AddChildToCanvas(Hint);
 	HintSlot->SetAnchors(FAnchors(0.f, 1.f));
 	HintSlot->SetAlignment(FVector2D(0.f, 1.f));
 	HintSlot->SetPosition(FVector2D(18.f, -12.f));
 	HintSlot->SetAutoSize(true);
+
+	// Orta: nisangah noktasi + baktigin esyanin adi
+	{
+		USizeBox* DotBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("Crosshair"));
+		DotBox->SetWidthOverride(8.f);
+		DotBox->SetHeightOverride(8.f);
+		UBorder* Dot = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
+		Dot->SetBrush(HudRoundedBrush(FLinearColor(1.f, 0.95f, 0.85f, 0.85f), FLinearColor(0.f, 0.f, 0.f, 0.6f), 4.f, 1.f, FVector2D(8.f, 8.f)));
+		DotBox->SetContent(Dot);
+		DotBox->SetVisibility(ESlateVisibility::Collapsed);
+		UCanvasPanelSlot* DotSlot = Root->AddChildToCanvas(DotBox);
+		DotSlot->SetAnchors(FAnchors(0.5f, 0.5f));
+		DotSlot->SetAlignment(FVector2D(0.5f, 0.5f));
+		DotSlot->SetAutoSize(true);
+		CrosshairDot = DotBox;
+
+		AimText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("AimText"));
+		HudStyleText(AimText, 16, FLinearColor(1.f, 0.88f, 0.6f, 1.f), true);
+		AimText->SetJustification(ETextJustify::Center);
+		AimText->SetVisibility(ESlateVisibility::Collapsed);
+		UCanvasPanelSlot* AimSlot = Root->AddChildToCanvas(AimText);
+		AimSlot->SetAnchors(FAnchors(0.5f, 0.5f));
+		AimSlot->SetAlignment(FVector2D(0.5f, 0.f));
+		AimSlot->SetPosition(FVector2D(0.f, 22.f));
+		AimSlot->SetAutoSize(true);
+	}
+
+	// Sol kenar: Coin Collection + Envanter ikonlari (dikey, ortada)
+	{
+		UVerticalBox* Side = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("SideMenu"));
+		UCanvasPanelSlot* SideSlot = Root->AddChildToCanvas(Side);
+		SideSlot->SetAnchors(FAnchors(0.f, 0.5f));
+		SideSlot->SetAlignment(FVector2D(0.f, 0.5f));
+		SideSlot->SetPosition(FVector2D(22.f, 0.f));
+		SideSlot->SetAutoSize(true);
+		UButton* Col = MakeSideButton(TEXT("/Game/FlipForFortune/UI/T_Icon_Collection.T_Icon_Collection"), TEXT("KOLEKSİYON"), TEXT("C"), HudGold);
+		Col->OnClicked.AddDynamic(this, &UFortuneHUDWidget::HandleCollectionIcon);
+		Side->AddChildToVerticalBox(Col)->SetPadding(FMargin(0.f, 0.f, 0.f, 14.f));
+		UButton* Inv = MakeSideButton(TEXT("/Game/FlipForFortune/UI/T_Icon_Inventory.T_Icon_Inventory"), TEXT("ENVANTER"), TEXT("I"), FLinearColor(0.8f, 0.55f, 1.f));
+		Inv->OnClicked.AddDynamic(this, &UFortuneHUDWidget::HandleInventoryIcon);
+		Side->AddChildToVerticalBox(Inv);
+	}
 
 	// Alt orta: [popup] + [para kapsulu]
 	UVerticalBox* Column = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("Column"));
@@ -421,6 +465,89 @@ void UFortuneHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTim
 		const float Pop = 1.f + 0.25f * FMath::Max(0.f, 1.f - PopupAge * 5.f);
 		PopupText->SetRenderScale(FVector2D(Pop, Pop));
 	}
+}
+
+UButton* UFortuneHUDWidget::MakeSideButton(const TCHAR* IconPath, const FString& Label, const FString& Key, const FLinearColor& Accent)
+{
+	UButton* B = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
+	FButtonStyle St;
+	St.SetNormal(HudRoundedBrush(FLinearColor(0.03f, 0.025f, 0.03f, 0.82f), FLinearColor(Accent.R, Accent.G, Accent.B, 0.55f), 18.f, 2.f));
+	St.SetHovered(HudRoundedBrush(FLinearColor(0.12f, 0.08f, 0.04f, 0.92f), Accent, 18.f, 3.f));
+	St.SetPressed(HudRoundedBrush(FLinearColor(0.02f, 0.02f, 0.02f, 0.95f), Accent, 18.f, 3.f));
+	St.SetNormalPadding(FMargin(8.f, 8.f, 8.f, 6.f));
+	St.SetPressedPadding(FMargin(8.f, 10.f, 8.f, 4.f));
+	B->SetStyle(St);
+	B->SetVisibility(ESlateVisibility::Visible);
+
+	UVerticalBox* V = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
+	UOverlay* O = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass());
+	USizeBox* IconBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
+	IconBox->SetWidthOverride(76.f);
+	IconBox->SetHeightOverride(76.f);
+	UImage* Icon = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());
+	if (UTexture2D* Tex = LoadObject<UTexture2D>(nullptr, IconPath, nullptr, LOAD_NoWarn | LOAD_Quiet))
+	{
+		FSlateBrush Br;
+		Br.SetResourceObject(Tex);
+		Br.ImageSize = FVector2f(76.f, 76.f);
+		Icon->SetBrush(Br);
+	}
+	else
+	{
+		Icon->SetBrush(HudRoundedBrush(Accent * 0.4f, Accent, 38.f, 3.f, FVector2D(76.f, 76.f)));
+	}
+	IconBox->SetContent(Icon);
+	O->AddChildToOverlay(IconBox);
+
+	// Kisayol tusu rozeti (sag alt kose): hangi tusla acildigi
+	UBorder* KeyB = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
+	KeyB->SetBrush(HudRoundedBrush(FLinearColor(0.f, 0.f, 0.f, 0.75f), FLinearColor(Accent.R, Accent.G, Accent.B, 0.8f), 8.f, 1.5f));
+	KeyB->SetPadding(FMargin(7.f, 1.f));
+	UTextBlock* KeyT = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	HudStyleText(KeyT, 14, Accent, true);
+	KeyT->SetText(FText::FromString(Key));
+	KeyB->SetContent(KeyT);
+	UOverlaySlot* KS = O->AddChildToOverlay(KeyB);
+	KS->SetHorizontalAlignment(HAlign_Right);
+	KS->SetVerticalAlignment(VAlign_Bottom);
+	V->AddChildToVerticalBox(O)->SetHorizontalAlignment(HAlign_Center);
+
+	UTextBlock* L = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	HudStyleText(L, 11, FLinearColor(1.f, 0.92f, 0.8f, 0.9f), true);
+	L->SetText(FText::FromString(Label));
+	L->SetJustification(ETextJustify::Center);
+	V->AddChildToVerticalBox(L)->SetHorizontalAlignment(HAlign_Center);
+
+	B->SetContent(V);
+	return B;
+}
+
+void UFortuneHUDWidget::SetCrosshair(bool bShow, const FText& Target)
+{
+	if (bShow != bCrosshairShown && CrosshairDot)
+	{
+		bCrosshairShown = bShow;
+		CrosshairDot->SetVisibility(bShow ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
+	const FString L = bShow ? Target.ToString() : FString();
+	if (L != AimLabel && AimText)
+	{
+		AimLabel = L;
+		AimText->SetText(FText::FromString(L.IsEmpty() ? FString() : FString::Printf(TEXT("[E]  %s"), *L)));
+		AimText->SetVisibility(L.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
+	}
+}
+
+void UFortuneHUDWidget::HandleCollectionIcon()
+{
+	if (AFortunePlayerController* PC = Cast<AFortunePlayerController>(GetOwningPlayer())) PC->ToggleCollection();
+	if (FSlateApplication::IsInitialized()) FSlateApplication::Get().SetAllUserFocusToGameViewport();
+}
+
+void UFortuneHUDWidget::HandleInventoryIcon()
+{
+	if (AFortunePlayerController* PC = Cast<AFortunePlayerController>(GetOwningPlayer())) PC->ToggleInventory();
+	if (FSlateApplication::IsInitialized()) FSlateApplication::Get().SetAllUserFocusToGameViewport();
 }
 
 #undef LOCTEXT_NAMESPACE

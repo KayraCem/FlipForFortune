@@ -29,14 +29,14 @@ AFortuneLandFXActor::AFortuneLandFXActor()
 	LitMaterial = Shape.Object;
 }
 
-void AFortuneLandFXActor::SpawnAt(UWorld* World, const FVector& Location, EFortuneLandFX Type, float Power, bool bHeads)
+void AFortuneLandFXActor::SpawnAt(UWorld* World, const FVector& Location, EFortuneLandFX Type, float Power, bool bHeads, const FLinearColor& Tint)
 {
 	if (!World || Type == EFortuneLandFX::None) return;
 	FActorSpawnParameters P;
 	P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	if (AFortuneLandFXActor* FX = World->SpawnActor<AFortuneLandFXActor>(AFortuneLandFXActor::StaticClass(), FTransform(Location), P))
 	{
-		FX->Play(Type, Power, bHeads);
+		FX->Play(Type, Power, bHeads, Tint);
 	}
 }
 
@@ -98,7 +98,7 @@ void AFortuneLandFXActor::Flash(const FLinearColor& Color, float Intensity, floa
 	Light->SetIntensity(Intensity);
 }
 
-void AFortuneLandFXActor::Play(EFortuneLandFX Type, float Power, bool bHeads)
+void AFortuneLandFXActor::Play(EFortuneLandFX Type, float Power, bool bHeads, const FLinearColor& Tint)
 {
 	// Isik saçan parcaciklar icin projedeki M_FX_Glow (Python betigi olusturur), yoksa normal materyal
 	GlowMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/FlipForFortune/Materials/M_FX_Glow.M_FX_Glow"), nullptr, LOAD_NoWarn | LOAD_Quiet);
@@ -107,14 +107,47 @@ void AFortuneLandFXActor::Play(EFortuneLandFX Type, float Power, bool bHeads)
 	auto N = [P](int32 Base) { return FMath::Max(1, FMath::RoundToInt32(Base * P)); };
 	const float S = 0.01f;   // Sphere/Cube 100 cm -> 1 cm
 
+	// ---- Her coinde: coinin renginde sok dalgasi halkasi + yukselen isiltilar + guclu flas (belirgin olsun)
+	if (Tint.A > 0.f)
+	{
+		const FLinearColor TC(Tint.R, Tint.G, Tint.B, 1.f);
+		const int32 Wave = AddGroup(SphereMesh, TC, true, 14.f);
+		const int32 WCount = 40;
+		for (int32 i = 0; i < WCount; ++i)
+		{
+			const float A = 2.f * PI * i / WCount;
+			const FVector Dir(FMath::Cos(A), FMath::Sin(A), 0.f);
+			Emit(Wave, Dir * 55.f * FMath::Sqrt(P), FVector(0.7f, 0.7f, 0.4f) * S, 0.38f, 0.f, 5.f, Dir * 1.5f + FVector(0.f, 0.f, 0.4f));
+		}
+		const int32 Wave2 = AddGroup(SphereMesh, FMath::Lerp(TC, FLinearColor::White, 0.5f), true, 20.f);
+		for (int32 i = 0; i < 24; ++i)
+		{
+			const float A = 2.f * PI * (i + 0.5f) / 24;
+			const FVector Dir(FMath::Cos(A), FMath::Sin(A), 0.f);
+			Emit(Wave2, Dir * 30.f * FMath::Sqrt(P) + FVector(0.f, 0.f, 18.f), FVector(0.4f * S), 0.45f, -30.f, 4.f, Dir + FVector(0.f, 0.f, 0.6f));
+		}
+		const int32 Glint = AddGroup(CubeMesh, FMath::Lerp(TC, FLinearColor::White, 0.35f), true, 24.f);
+		for (int32 i = 0; i < N(16); ++i)
+		{
+			// 4 koseli yildiz parilti: iki ince capraz cubuk (ayni hizda)
+			const FVector V = RandRing(8.f, 30.f, FMath::FRandRange(45.f, 95.f));
+			const FVector O(FMath::FRandRange(-2.f, 2.f), FMath::FRandRange(-2.f, 2.f), 1.f);
+			const float L = FMath::FRandRange(0.9f, 1.6f);
+			const float Life = FMath::FRandRange(0.6f, 1.0f);
+			Emit(Glint, V, FVector(L, 0.09f, 0.09f) * S, Life, -40.f, 2.f, O, true, false, true);
+			Emit(Glint, V, FVector(0.09f, L, 0.09f) * S, Life, -40.f, 2.f, O, true, false, true);
+		}
+		Flash(TC, 2600.f * P, 120.f);
+	}
+
 	switch (Type)
 	{
 	case EFortuneLandFX::Dust:
 	{
 		const int32 G = AddGroup(SphereMesh, FLinearColor(0.42f, 0.36f, 0.3f), false);
-		for (int32 i = 0; i < N(16); ++i)
+		for (int32 i = 0; i < N(24); ++i)
 		{
-			const float Sz = FMath::FRandRange(0.8f, 1.6f) * S;
+			const float Sz = FMath::FRandRange(1.2f, 2.2f) * S;
 			Emit(G, RandRing(15.f, 45.f, FMath::FRandRange(5.f, 20.f)), FVector(Sz), FMath::FRandRange(0.45f, 0.8f), -20.f, 3.f,
 				FVector(0.f, 0.f, 0.5f), /*grow*/ true);
 		}
@@ -125,7 +158,7 @@ void AFortuneLandFXActor::Play(EFortuneLandFX Type, float Power, bool bHeads)
 		const int32 G = AddGroup(CubeMesh, FLinearColor(1.f, 0.95f, 0.8f), true, 12.f);
 		for (int32 i = 0; i < N(22); ++i)
 		{
-			Emit(G, RandRing(50.f, 140.f, FMath::FRandRange(80.f, 180.f)), FVector(0.6f, 0.12f, 0.12f) * S, FMath::FRandRange(0.3f, 0.6f),
+			Emit(G, RandRing(50.f, 140.f, FMath::FRandRange(80.f, 180.f)), FVector(0.9f, 0.16f, 0.16f) * S, FMath::FRandRange(0.4f, 0.7f),
 				-700.f, 1.f, FVector(0.f, 0.f, 1.f), false, true);
 		}
 		Flash(FLinearColor(1.f, 0.95f, 0.85f), 900.f * P, 70.f);
@@ -155,7 +188,7 @@ void AFortuneLandFXActor::Play(EFortuneLandFX Type, float Power, bool bHeads)
 		const int32 Leaf = AddGroup(CubeMesh, FLinearColor(0.15f, 0.65f, 0.2f), false);
 		for (int32 i = 0; i < N(14); ++i)
 		{
-			Emit(Leaf, RandRing(25.f, 70.f, FMath::FRandRange(60.f, 120.f)), FVector(1.4f, 0.7f, 0.06f) * S, FMath::FRandRange(1.f, 1.5f),
+			Emit(Leaf, RandRing(25.f, 70.f, FMath::FRandRange(60.f, 120.f)), FVector(2.0f, 1.0f, 0.08f) * S, FMath::FRandRange(1.f, 1.5f),
 				-160.f, 2.5f, FVector(0.f, 0.f, 1.f), false, true);
 		}
 		const int32 Clover = AddGroup(SphereMesh, FLinearColor(0.35f, 1.f, 0.4f), true, 5.f);
@@ -175,7 +208,7 @@ void AFortuneLandFXActor::Play(EFortuneLandFX Type, float Power, bool bHeads)
 		{
 			const float A = 2.f * PI * i / Count;
 			const FVector Dir(FMath::Cos(A), FMath::Sin(A), 0.f);
-			Emit(Ring, Dir * 70.f + FVector(0.f, 0.f, 15.f), FVector(1.1f * S), 0.45f, 30.f, 3.f, Dir * 2.f, true, false, true);
+			Emit(Ring, Dir * 70.f + FVector(0.f, 0.f, 15.f), FVector(1.6f, 1.6f, 2.4f) * S, 0.5f, 40.f, 3.f, Dir * 2.f, true, false, true);
 		}
 		const int32 Ember = AddGroup(SphereMesh, FLinearColor(1.f, 0.6f, 0.15f), true, 14.f);
 		for (int32 i = 0; i < N(16); ++i)

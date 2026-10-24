@@ -13,6 +13,7 @@ class UFortuneSubsystem;
 class UMaterialInterface;
 class UProceduralMeshComponent;
 class AFortuneHandActor;
+class AFortuneHeroActor;
 
 UCLASS(Blueprintable)
 class MYPROJECT_API AFortuneCoinFlipper : public AActor
@@ -93,6 +94,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fortune")
 	TObjectPtr<AFortuneHandActor> Hand;
 
+	/** Ana karakter: doluysa coin onun avucundan atilir ve avucuna geri duser (masaya degil). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fortune")
+	TObjectPtr<AFortuneHeroActor> Hero;
+
 	/** Sonuc masada ne kadar gorunsun, sonra coin ele donsun (sn). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fortune")
 	float ShowResultTime = 0.6f;
@@ -145,7 +150,16 @@ private:
 	FVector TossStart = FVector::ZeroVector;
 	FVector ReturnFrom = FVector::ZeroVector;
 
+	float CatchTimer = -1.f;
+
+	bool HasHand() const { return Hand != nullptr || Hero != nullptr; }
+	FVector HandPoint() const;
+	void HandPose(float Windup, float Flick);
+
 	FTransform RestWorld() const;
+	/** Dinlenme donusu: karakter varsa onun govdesine gore (bakinca coin de doner). */
+	FQuat RestRotation() const;
+	FQuat HeroStartFrame = FQuat::Identity;
 	FQuat FaceQuat(bool bHeads) const;
 	void PlaceCoinInHand();
 };

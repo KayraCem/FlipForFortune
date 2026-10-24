@@ -2,6 +2,7 @@
 #include "FortuneGachaChest.h"
 #include "FortuneSubsystem.h"
 #include "FortuneCoinData.h"
+#include "FortuneCoinIconStudio.h"
 #include "FortuneHUDWidget.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
@@ -17,6 +18,9 @@
 #include "Components/Spacer.h"
 #include "Components/Button.h"
 #include "Components/ScrollBox.h"
+#include "Components/WrapBox.h"
+#include "Components/WrapBoxSlot.h"
+#include "Engine/Texture2D.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
 #include "FortuneUIStyle.h"
@@ -222,8 +226,7 @@ void UFortuneSummonWidget::BuildTree()
 	UHorizontalBoxSlot* TitleSlot = Head->AddChildToHorizontalBox(TitleCol);
 	TitleSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
 	TitleSlot->SetVerticalAlignment(VAlign_Center);
-	TitleCol->AddChildToVerticalBox(StyText(T, TEXT("HAZİNE SANDIĞI"), 30, SumGold, true, 100));
-	TitleCol->AddChildToVerticalBox(StyText(T, TEXT("Şansını dene, efsanevi coinleri topla"), 14, FLinearColor(1.f, 1.f, 1.f, 0.55f), false));
+	TitleCol->AddChildToVerticalBox(StyText(T, TEXT("DİLEK ÇEŞMESİ"), 30, SumGold, true, 100));
 
 	UBorder* MoneyPill = T->ConstructWidget<UBorder>(UBorder::StaticClass());
 	MoneyPill->SetBrush(StyRounded(FLinearColor(0.f, 0.f, 0.f, 0.55f), StyWithAlpha(SumGold, 0.7f), 22.f, 1.5f));
@@ -237,7 +240,7 @@ void UFortuneSummonWidget::BuildTree()
 	// ---- Koleksiyon ilerlemesi + Luck
 	UHorizontalBox* InfoRow = T->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
 	Col->AddChildToVerticalBox(InfoRow);
-	CollectionText = StyText(T, TEXT("KOLEKSİYON 0/0"), 14, FLinearColor(0.75f, 0.95f, 1.f));
+	CollectionText = StyText(T, TEXT("0 / 0"), 14, FLinearColor(0.75f, 0.95f, 1.f));
 	InfoRow->AddChildToHorizontalBox(CollectionText)->SetVerticalAlignment(VAlign_Center);
 	FStyBar Coll = StyMakeBar(T, FLinearColor(0.35f, 0.8f, 1.f), 8.f);
 	CollFill = Coll.FillSlot;
@@ -251,20 +254,20 @@ void UFortuneSummonWidget::BuildTree()
 	InfoRow->AddChildToHorizontalBox(LuckText)->SetVerticalAlignment(VAlign_Center);
 
 	// ---- Nadirlik dagilimi cubugu
-	Col->AddChildToVerticalBox(StyText(T, TEXT("NADİRLİK DAĞILIMI"), 12, FLinearColor(1.f, 1.f, 1.f, 0.45f), true, 60))->SetPadding(FMargin(0.f, 12.f, 0.f, 4.f));
 	UBorder* DistBg = T->ConstructWidget<UBorder>(UBorder::StaticClass());
 	DistBg->SetBrush(StyRounded(FLinearColor(0.f, 0.f, 0.f, 0.5f), FLinearColor(1.f, 1.f, 1.f, 0.08f), 8.f, 1.f));
 	DistBg->SetPadding(FMargin(2.f));
 	DistRow = T->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
 	DistBg->SetContent(StySized(T, DistRow, 0.f, 12.f));
 	Col->AddChildToVerticalBox(DistBg);
+	DistBg->SetVisibility(ESlateVisibility::Collapsed);   // sade gorunum: dagilim cubugu gizli
 
 	// ---- Liste
 	UBorder* ListBg = T->ConstructWidget<UBorder>(UBorder::StaticClass());
 	ListBg->SetBrush(StyRounded(FLinearColor(0.f, 0.f, 0.f, 0.35f), FLinearColor(1.f, 1.f, 1.f, 0.06f), 14.f, 1.f));
 	ListBg->SetPadding(FMargin(10.f, 8.f));
 	USizeBox* ListBox = T->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-	ListBox->SetMaxDesiredHeight(380.f);
+	ListBox->SetMaxDesiredHeight(400.f);
 	ListBox->SetContent(ListBg);
 	Col->AddChildToVerticalBox(ListBox)->SetPadding(FMargin(0.f, 12.f, 0.f, 0.f));
 	UScrollBox* Scroll = T->ConstructWidget<UScrollBox>(UScrollBox::StaticClass());
@@ -382,9 +385,7 @@ void UFortuneSummonWidget::Refresh()
 		const bool bOk = Money >= Cost;
 		Affordable[i] = bOk;
 		SummonButtons[i]->SetIsEnabled(bOk);
-		SummonCosts[i]->SetText(FText::FromString(bOk
-			? FString::Printf(TEXT("$ %s"), *UFortuneHUDWidget::FormatMoney(Cost).ToString())
-			: FString::Printf(TEXT("$ %s  (eksik %s)"), *UFortuneHUDWidget::FormatMoney(Cost).ToString(), *UFortuneHUDWidget::FormatMoney(Cost - Money).ToString())));
+		SummonCosts[i]->SetText(FText::FromString(FString::Printf(TEXT("$ %s"), *UFortuneHUDWidget::FormatMoney(Cost).ToString())));
 		SummonCosts[i]->SetColorAndOpacity(FSlateColor(bOk ? FLinearColor(1.f, 0.9f, 0.6f) : FLinearColor(1.f, 0.5f, 0.45f)));
 		if (!bOk) SummonBoxes[i]->SetRenderScale(FVector2D(1.f, 1.f));
 	}
@@ -411,7 +412,7 @@ void UFortuneSummonWidget::RebuildList()
 			OwnedLevels.Add(E.Coin->GetCoinId(), E.Level);
 		}
 	}
-	CollectionText->SetText(FText::FromString(FString::Printf(TEXT("KOLEKSİYON  %d / %d"), OwnedCount, Total)));
+	CollectionText->SetText(FText::FromString(FString::Printf(TEXT("%d / %d"), OwnedCount, Total)));
 	FStyBar CB;
 	CB.FillSlot = CollFill;
 	CB.RestSlot = CollRest;
@@ -445,9 +446,10 @@ void UFortuneSummonWidget::RebuildList()
 		S->SetPadding(FMargin(1.f, 0.f));
 	}
 
-	// Gruplu liste
+	// Nadirlik gruplari: baslik (isim + toplam sans) + o nadirlikteki coinlerin kendisi
 	List->ClearChildren();
 	int32 LastRarity = -1;
+	UWrapBox* Grid = nullptr;
 	for (const UFortuneCoinData* C : Coins)
 	{
 		const FLinearColor RC = UFortuneSubsystem::GetRarityColor(C->Rarity);
@@ -460,7 +462,7 @@ void UFortuneSummonWidget::RebuildList()
 			LastRarity = (int32)C->Rarity;
 			UHorizontalBox* GroupRow = T->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
 			List->AddChildToVerticalBox(GroupRow)->SetPadding(FMargin(0.f, List->GetChildrenCount() > 0 ? 10.f : 0.f, 0.f, 4.f));
-			GroupRow->AddChildToHorizontalBox(StyChip(T, StyText(T, UFortuneSubsystem::GetRarityName(C->Rarity), 13, RC, true, 80), RC))->SetVerticalAlignment(VAlign_Center);
+			GroupRow->AddChildToHorizontalBox(StyText(T, UFortuneSubsystem::GetRarityName(C->Rarity), 14, RC, true, 80))->SetVerticalAlignment(VAlign_Center);
 			UImage* Line = T->ConstructWidget<UImage>(UImage::StaticClass());
 			Line->SetBrush(StyRounded(StyWithAlpha(RC, 0.25f), FLinearColor::Transparent, 1.f, 0.f, FVector2D(8.f, 2.f)));
 			UHorizontalBoxSlot* LS = GroupRow->AddChildToHorizontalBox(Line);
@@ -468,46 +470,48 @@ void UFortuneSummonWidget::RebuildList()
 			LS->SetVerticalAlignment(VAlign_Center);
 			LS->SetPadding(FMargin(10.f, 0.f));
 			const float* GC = RarityChance.Find(C->Rarity);
-			GroupRow->AddChildToHorizontalBox(StyText(T, SummonOdds(GC ? *GC : 0.f), 13, StyWithAlpha(RC, 0.9f)))->SetVerticalAlignment(VAlign_Center);
+			const float GV = GC ? *GC : 0.f;
+			const FString GS = GV >= 0.01f ? FString::Printf(TEXT("%%%.1f"), GV * 100.f) : FString::Printf(TEXT("%%%.2f"), GV * 100.f);
+			GroupRow->AddChildToHorizontalBox(StyText(T, GS, 14, StyWithAlpha(RC, 0.9f)))->SetVerticalAlignment(VAlign_Center);
+
+			Grid = T->ConstructWidget<UWrapBox>(UWrapBox::StaticClass());
+			Grid->SetInnerSlotPadding(FVector2D(8.f, 8.f));
+			List->AddChildToVerticalBox(Grid);
 		}
 
-		UBorder* RowBg = T->ConstructWidget<UBorder>(UBorder::StaticClass());
-		RowBg->SetBrush(StyRounded(FLinearColor(RC.R * 0.1f, RC.G * 0.1f, RC.B * 0.1f, 0.6f), StyWithAlpha(RC, bOwned ? 0.35f : 0.15f), 10.f, 1.f));
-		RowBg->SetPadding(FMargin(10.f, 6.f));
-		List->AddChildToVerticalBox(RowBg)->SetPadding(FMargin(0.f, 2.f));
-		UHorizontalBox* Row = T->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-		RowBg->SetContent(Row);
-
-		// Coin simgesi
-		UOverlay* Icon = T->ConstructWidget<UOverlay>(UOverlay::StaticClass());
-		UImage* Dot = T->ConstructWidget<UImage>(UImage::StaticClass());
-		Dot->SetBrush(StyRounded(bOwned ? C->IconColor : FLinearColor(0.05f, 0.05f, 0.06f), RC, 14.f, 2.f, FVector2D(28.f, 28.f)));
-		Icon->AddChildToOverlay(Dot);
+		// Coin karti: coinin kendi yuzu (sahip degilsen karanlik siluet + ?)
+		UOverlay* Card = T->ConstructWidget<UOverlay>(UOverlay::StaticClass());
+		UImage* Ring = T->ConstructWidget<UImage>(UImage::StaticClass());
+		Ring->SetBrush(StyRounded(FLinearColor(RC.R * 0.12f, RC.G * 0.12f, RC.B * 0.12f, 0.9f), StyWithAlpha(RC, bOwned ? 0.9f : 0.35f), 34.f, 2.f, FVector2D(68.f, 68.f)));
+		Card->AddChildToOverlay(Ring);
+		UImage* Face = T->ConstructWidget<UImage>(UImage::StaticClass());
+		if (C->HeadsTexture)
+		{
+			AFortuneCoinIconStudio::ApplyIcon(Face, this, C, bOwned, 66.f);   // coinin 3D gorunusu
+		}
+		else
+		{
+			Face->SetBrush(StyRounded(bOwned ? C->IconColor : FLinearColor(0.05f, 0.05f, 0.06f), RC, 29.f, 0.f, FVector2D(58.f, 58.f)));
+		}
+		UOverlaySlot* FS = Card->AddChildToOverlay(Face);
+		FS->SetHorizontalAlignment(HAlign_Center);
+		FS->SetVerticalAlignment(VAlign_Center);
 		if (!bOwned)
 		{
-			UOverlaySlot* Q = Icon->AddChildToOverlay(StyText(T, TEXT("?"), 14, StyWithAlpha(RC, 0.8f)));
+			UOverlaySlot* Q = Card->AddChildToOverlay(StyText(T, TEXT("?"), 22, StyWithAlpha(RC, 0.85f)));
 			Q->SetHorizontalAlignment(HAlign_Center);
 			Q->SetVerticalAlignment(VAlign_Center);
 		}
-		UHorizontalBoxSlot* IconSlot = Row->AddChildToHorizontalBox(StySized(T, Icon, 28.f, 28.f));
-		IconSlot->SetVerticalAlignment(VAlign_Center);
-		IconSlot->SetPadding(FMargin(0.f, 0.f, 12.f, 0.f));
-
-		const FString Name = bOwned ? C->DisplayName.ToString() : FString(TEXT("???"));
-		UHorizontalBoxSlot* NameSlot = Row->AddChildToHorizontalBox(StyText(T, Name, 17, FLinearColor(1.f, 1.f, 1.f, bOwned ? 0.95f : 0.45f)));
-		NameSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-		NameSlot->SetVerticalAlignment(VAlign_Center);
-
-		// Etiket: sahipsen seviye, degilse YENI
-		const FLinearColor TagC = bOwned ? FLinearColor(0.45f, 0.95f, 0.5f) : RC;
-		const FString Tag = bOwned ? FString::Printf(TEXT("SAHİP  Lv %d"), *Lv) : FString(TEXT("YENİ"));
-		UHorizontalBoxSlot* TagSlot = Row->AddChildToHorizontalBox(StyChip(T, StyText(T, Tag, 12, TagC), TagC));
-		TagSlot->SetVerticalAlignment(VAlign_Center);
-		TagSlot->SetPadding(FMargin(8.f, 0.f));
-
-		UTextBlock* OddsT = StyText(T, SummonOdds(Chance), 15, FLinearColor(1.f, 0.95f, 0.5f));
-		OddsT->SetJustification(ETextJustify::Right);
-		Row->AddChildToHorizontalBox(StySized(T, OddsT, 170.f, 0.f))->SetVerticalAlignment(VAlign_Center);
+		else
+		{
+			// sag altta kucuk seviye rozeti
+			UOverlaySlot* LvS = Card->AddChildToOverlay(StyChip(T, StyText(T, FString::Printf(TEXT("%d"), *Lv), 11, FLinearColor(0.55f, 1.f, 0.6f)), FLinearColor(0.45f, 0.95f, 0.5f)));
+			LvS->SetHorizontalAlignment(HAlign_Right);
+			LvS->SetVerticalAlignment(VAlign_Bottom);
+		}
+		const FString Tip = FString::Printf(TEXT("%s   %%%.2f"), bOwned ? *C->DisplayName.ToString() : TEXT("???"), Chance * 100.f);
+		Card->SetToolTipText(FText::FromString(Tip));
+		if (Grid) Grid->AddChildToWrapBox(StySized(T, Card, 68.f, 68.f));
 	}
 }
 
@@ -604,7 +608,7 @@ void UFortuneGachaRevealWidget::BuildTree()
 	UCanvasPanelSlot* BottomSlot = Root->AddChildToCanvas(Bottom);
 	BottomSlot->SetAnchors(FAnchors(0.5f, 1.f));
 	BottomSlot->SetAlignment(FVector2D(0.5f, 1.f));
-	BottomSlot->SetPosition(FVector2D(0.f, -50.f));
+	BottomSlot->SetPosition(FVector2D(0.f, -130.f));
 	BottomSlot->SetAutoSize(true);
 
 	RarityText = GachaText(T, TEXT("COMMON"), 22, FLinearColor::White);
@@ -614,11 +618,12 @@ void UFortuneGachaRevealWidget::BuildTree()
 	PassiveText = GachaText(T, TEXT(""), 18, FLinearColor(1.f, 1.f, 1.f, 0.8f), false);
 	PassiveText->SetJustification(ETextJustify::Center);
 	Bottom->AddChildToVerticalBox(PassiveText)->SetHorizontalAlignment(HAlign_Center);
-	HintText = GachaText(T, TEXT("Kapatmak için tıkla"), 20, FLinearColor(1.f, 1.f, 1.f, 0.85f));
+	HintText = GachaText(T, TEXT("Enter: Tamam"), 16, FLinearColor(1.f, 1.f, 1.f, 0.6f));
 	UVerticalBoxSlot* HintSlot = Bottom->AddChildToVerticalBox(HintText);
 	HintSlot->SetHorizontalAlignment(HAlign_Center);
 	HintSlot->SetPadding(FMargin(0.f, 24.f, 0.f, 0.f));
 	HintText->SetRenderOpacity(0.f);
+	HintText->SetVisibility(ESlateVisibility::Collapsed);
 }
 
 void UFortuneGachaRevealWidget::Setup(AFortuneGachaChest* InChest, const UFortuneCoinData* Coin, bool bDuplicate, int32 DuplicateXP)
@@ -635,6 +640,18 @@ void UFortuneGachaRevealWidget::Setup(AFortuneGachaChest* InChest, const UFortun
 	RarityText->SetColorAndOpacity(FSlateColor(RC));
 	PassiveText->SetText(Coin->PassiveDescription.IsEmpty() ? FText::GetEmpty() : FText::Format(FText::FromString(TEXT("Pasif: {0}")), Coin->PassiveDescription));
 	SetIsFocusable(true);
+	if (UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WidgetTree->RootWidget))
+	{
+		if (UFortuneSummonAgainBar* Bar = CreateWidget<UFortuneSummonAgainBar>(GetOwningPlayer(), UFortuneSummonAgainBar::StaticClass()))
+		{
+			Bar->Chest = InChest;
+			UCanvasPanelSlot* S = RootCanvas->AddChildToCanvas(Bar);
+			S->SetAnchors(FAnchors(0.5f, 1.f));
+			S->SetAlignment(FVector2D(0.5f, 1.f));
+			S->SetPosition(FVector2D(0.f, -30.f));
+			S->SetAutoSize(true);
+		}
+	}
 }
 
 void UFortuneGachaRevealWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
@@ -670,13 +687,13 @@ void UFortuneGachaRevealWidget::TryClose()
 
 FReply UFortuneGachaRevealWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	TryClose();
-	return FReply::Handled();
+	return FReply::Handled();   // bos yere tik kapatmaz: alttaki butonlar
 }
 
 FReply UFortuneGachaRevealWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
-	TryClose();
+	const FKey K = InKeyEvent.GetKey();
+	if (K == EKeys::Enter || K == EKeys::Escape || K == EKeys::SpaceBar) TryClose();
 	return FReply::Handled();
 }
 
@@ -717,16 +734,17 @@ void UFortuneGachaMultiRevealWidget::BuildTree()
 	UCanvasPanelSlot* BSlot = Canvas->AddChildToCanvas(Bottom);
 	BSlot->SetAnchors(FAnchors(0.5f, 1.f));
 	BSlot->SetAlignment(FVector2D(0.5f, 1.f));
-	BSlot->SetPosition(FVector2D(0.f, -40.f));
+	BSlot->SetPosition(FVector2D(0.f, -112.f));
 	BSlot->SetAutoSize(true);
 	SummaryText = StyText(T, TEXT(""), 20, FLinearColor::White);
 	SummaryText->SetJustification(ETextJustify::Center);
 	Bottom->AddChildToVerticalBox(SummaryText)->SetHorizontalAlignment(HAlign_Center);
-	HintText = StyText(T, TEXT("Kapatmak için tıkla"), 18, FLinearColor(1.f, 1.f, 1.f, 0.85f));
+	HintText = StyText(T, TEXT("Enter: Tamam"), 14, FLinearColor(1.f, 1.f, 1.f, 0.6f));
 	UVerticalBoxSlot* HintSlot = Bottom->AddChildToVerticalBox(HintText);
 	HintSlot->SetHorizontalAlignment(HAlign_Center);
 	HintSlot->SetPadding(FMargin(0.f, 14.f, 0.f, 0.f));
 	HintText->SetRenderOpacity(0.f);
+	Bottom->SetVisibility(ESlateVisibility::Collapsed);   // ozet ve ipucu yazilari gizli (altta butonlar var)
 }
 
 void UFortuneGachaMultiRevealWidget::Setup(AFortuneGachaChest* InChest, const TArray<UFortuneCoinData*>& Coins, const TArray<bool>& Duplicates,
@@ -779,6 +797,16 @@ void UFortuneGachaMultiRevealWidget::Setup(AFortuneGachaChest* InChest, const TA
 			NewCount, *Best->DisplayName.ToString(), *UFortuneSubsystem::GetRarityName(Best->Rarity))));
 	}
 	SetIsFocusable(true);
+	if (UFortuneSummonAgainBar* Bar = CreateWidget<UFortuneSummonAgainBar>(GetOwningPlayer(), UFortuneSummonAgainBar::StaticClass()))
+	{
+		Bar->Chest = InChest;
+		Bar->Delay = 1.f;
+		UCanvasPanelSlot* S = Canvas->AddChildToCanvas(Bar);
+		S->SetAnchors(FAnchors(0.5f, 1.f));
+		S->SetAlignment(FVector2D(0.5f, 1.f));
+		S->SetPosition(FVector2D(0.f, -26.f));
+		S->SetAutoSize(true);
+	}
 }
 
 void UFortuneGachaMultiRevealWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
@@ -825,12 +853,220 @@ void UFortuneGachaMultiRevealWidget::TryClose()
 
 FReply UFortuneGachaMultiRevealWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	TryClose();
-	return FReply::Handled();
+	return FReply::Handled();   // bos yere tik kapatmaz: alttaki butonlar
 }
 
 FReply UFortuneGachaMultiRevealWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
-	TryClose();
+	const FKey K = InKeyEvent.GetKey();
+	if (K == EKeys::Enter || K == EKeys::Escape || K == EKeys::SpaceBar) TryClose();
 	return FReply::Handled();
+}
+
+// ============================================================ Legendary+ afisi
+
+TSharedRef<SWidget> UFortuneLegendBannerWidget::RebuildWidget()
+{
+	using namespace FortuneStyle;
+	if (WidgetTree && !WidgetTree->RootWidget)
+	{
+		UCanvasPanel* Root = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("Root"));
+		WidgetTree->RootWidget = Root;
+		Flash = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());
+		UCanvasPanelSlot* FS = Root->AddChildToCanvas(Flash);
+		FS->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
+		FS->SetOffsets(FMargin(0.f));
+		UVerticalBox* Col = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
+		UCanvasPanelSlot* CS = Root->AddChildToCanvas(Col);
+		CS->SetAnchors(FAnchors(0.5f, 0.22f));
+		CS->SetAlignment(FVector2D(0.5f, 0.5f));
+		CS->SetAutoSize(true);
+		BigText = StyText(WidgetTree, TEXT("LEGENDARY!"), 86, FLinearColor::White, true, 250);
+		BigText->SetJustification(ETextJustify::Center);
+		BigText->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+		Col->AddChildToVerticalBox(BigText)->SetHorizontalAlignment(HAlign_Center);
+		SubText = StyText(WidgetTree, TEXT(""), 30, FLinearColor::White, true, 80);
+		SubText->SetJustification(ETextJustify::Center);
+		Col->AddChildToVerticalBox(SubText)->SetHorizontalAlignment(HAlign_Center);
+		Root->SetVisibility(ESlateVisibility::HitTestInvisible);
+	}
+	return Super::RebuildWidget();
+}
+
+void UFortuneLegendBannerWidget::Setup(const FString& RarityName, const FLinearColor& Color, const FString& CoinName)
+{
+	Tint = Color;
+	if (BigText)
+	{
+		BigText->SetText(FText::FromString(RarityName.ToUpper() + TEXT("!")));
+		BigText->SetColorAndOpacity(FSlateColor(Color));
+	}
+	if (SubText) SubText->SetText(FText::FromString(CoinName));
+}
+
+void UFortuneLegendBannerWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	Age += InDeltaTime;
+	// Beyaz patlama -> nadirlik rengine soner
+	if (Flash)
+	{
+		const float A = Age < 0.08f ? Age / 0.08f : FMath::Max(0.f, 1.f - (Age - 0.08f) / 0.7f);
+		const FLinearColor C = FMath::Lerp(FLinearColor::White, Tint, FMath::Clamp(Age * 3.f, 0.f, 1.f));
+		Flash->SetColorAndOpacity(FLinearColor(C.R, C.G, C.B, 0.85f * A));
+	}
+	// Yazi: buyuk gelir, sallanarak durur, sonda kaybolur
+	const float In = FMath::Clamp((Age - 0.25f) / 0.35f, 0.f, 1.f);
+	const float Out = FMath::Clamp((Age - 2.5f) / 0.4f, 0.f, 1.f);
+	if (BigText)
+	{
+		const float S = FMath::Lerp(2.4f, 1.f, FMath::InterpEaseOut(0.f, 1.f, In, 3.f)) + 0.04f * FMath::Sin(Age * 8.f);
+		BigText->SetRenderScale(FVector2D(S, S));
+		BigText->SetRenderOpacity(In * (1.f - Out));
+	}
+	if (SubText) SubText->SetRenderOpacity(FMath::Clamp((Age - 0.7f) / 0.4f, 0.f, 1.f) * (1.f - Out));
+	if (Age > 3.f) RemoveFromParent();
+}
+
+// ============================================================ Summon sahnesi para gostergesi
+
+TSharedRef<SWidget> UFortuneMoneyChipWidget::RebuildWidget()
+{
+	using namespace FortuneStyle;
+	if (WidgetTree && !WidgetTree->RootWidget)
+	{
+		const FLinearColor Gold(1.f, 0.8f, 0.3f, 1.f);
+		UCanvasPanel* Root = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("Root"));
+		WidgetTree->RootWidget = Root;
+		UBorder* Pill = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
+		Pill->SetBrush(StyRounded(FLinearColor(0.f, 0.f, 0.f, 0.6f), StyWithAlpha(Gold, 0.75f), 22.f, 1.5f));
+		Pill->SetPadding(FMargin(18.f, 6.f));
+		MoneyText = StyText(WidgetTree, TEXT("$ 0"), 24, Gold);
+		Pill->SetContent(MoneyText);
+		UCanvasPanelSlot* S = Root->AddChildToCanvas(Pill);
+		S->SetAnchors(FAnchors(1.f, 0.f));
+		S->SetAlignment(FVector2D(1.f, 0.f));
+		S->SetPosition(FVector2D(-28.f, 24.f));
+		S->SetAutoSize(true);
+		Root->SetVisibility(ESlateVisibility::HitTestInvisible);
+	}
+	return Super::RebuildWidget();
+}
+
+void UFortuneMoneyChipWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	const UGameInstance* GI = GetGameInstance();
+	const UFortuneSubsystem* F = GI ? GI->GetSubsystem<UFortuneSubsystem>() : nullptr;
+	if (!F || !MoneyText) return;
+	const double M = F->GetMoney();
+	if (M != Shown)
+	{
+		Shown = M;
+		MoneyText->SetText(FText::FromString(FString::Printf(TEXT("$ %s"), *UFortuneHUDWidget::FormatMoney(M).ToString())));
+	}
+}
+
+// ============================================================ Sonuc ekrani butonlari
+
+TSharedRef<SWidget> UFortuneSummonAgainBar::RebuildWidget()
+{
+	if (WidgetTree && !WidgetTree->RootWidget)
+	{
+		BuildTree();
+	}
+	return Super::RebuildWidget();
+}
+
+UButton* UFortuneSummonAgainBar::MakeBarButton(const FString& Label, const FLinearColor& Fill, const FLinearColor& Accent, UTextBlock*& OutText, float Width)
+{
+	using namespace FortuneStyle;
+	OutText = StyText(WidgetTree, Label, 17, FLinearColor::White);
+	OutText->SetJustification(ETextJustify::Center);
+	UButton* B = StyButton(WidgetTree, OutText, Fill, Accent, 14.f);
+	return B;
+}
+
+void UFortuneSummonAgainBar::BuildTree()
+{
+	using namespace FortuneStyle;
+	if (const AFortuneGachaChest* C = Chest.Get())
+	{
+		AgainCount = C->GetLastCount();
+	}
+	OtherCount = (AgainCount == 10) ? 1 : 10;
+
+	UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("AgainRow"));
+	WidgetTree->RootWidget = Row;
+
+	UTextBlock* T1 = nullptr; UTextBlock* T2 = nullptr; UTextBlock* T3 = nullptr;
+	AgainBtn = MakeBarButton(TEXT("TEKRAR"), FLinearColor(0.07f, 0.2f, 0.18f, 0.95f), FLinearColor(0.35f, 1.f, 0.85f), T1, 200.f);
+	OtherBtn = MakeBarButton(TEXT("x10"), FLinearColor(0.2f, 0.12f, 0.03f, 0.95f), FLinearColor(1.f, 0.78f, 0.3f), T2, 200.f);
+	OkBtn = MakeBarButton(TEXT("TAMAM"), FLinearColor(0.08f, 0.08f, 0.09f, 0.95f), FLinearColor(1.f, 1.f, 1.f, 0.8f), T3, 160.f);
+	AgainText = T1; OtherText = T2; OkText = T3;
+	AgainBtn->OnClicked.AddDynamic(this, &UFortuneSummonAgainBar::OnAgain);
+	OtherBtn->OnClicked.AddDynamic(this, &UFortuneSummonAgainBar::OnOther);
+	OkBtn->OnClicked.AddDynamic(this, &UFortuneSummonAgainBar::OnOk);
+	// Sira: TAMAM (sol) - diger - x10 (en sag)
+	const bool bAgainIsTen = AgainCount == 10;
+	UButton* Btns[] = { OkBtn, bAgainIsTen ? OtherBtn.Get() : AgainBtn.Get(), bAgainIsTen ? AgainBtn.Get() : OtherBtn.Get() };
+	const float Widths[] = { 160.f, 210.f, 210.f };
+	for (int32 i = 0; i < 3; ++i)
+	{
+		UHorizontalBoxSlot* S = Row->AddChildToHorizontalBox(StySized(WidgetTree, Btns[i], Widths[i], 62.f));
+		S->SetPadding(FMargin(8.f, 0.f));
+		S->SetVerticalAlignment(VAlign_Center);
+	}
+	Row->SetRenderOpacity(0.f);
+	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+}
+
+void UFortuneSummonAgainBar::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	Age += InDeltaTime;
+	const float A = FMath::Clamp((Age - Delay) / 0.3f, 0.f, 1.f);
+	if (UWidget* Root = WidgetTree ? WidgetTree->RootWidget : nullptr)
+	{
+		Root->SetRenderOpacity(A);
+		Root->SetRenderTranslation(FVector2D(0.f, (1.f - A) * 20.f));
+	}
+
+	// Fiyat ve para yetiyor mu (her karede, ucuz)
+	const UGameInstance* GI = GetGameInstance();
+	const UFortuneSubsystem* F = GI ? GI->GetSubsystem<UFortuneSubsystem>() : nullptr;
+	if (!F) return;
+	const bool bReady = A >= 1.f && !bUsed;
+	auto Setup = [&](UButton* B, UTextBlock* T, int32 Count, const TCHAR* Title)
+	{
+		if (!B || !T) return;
+		const double Cost = F->GetMultiSummonCost(Count);
+		const bool bCan = F->GetMoney() >= Cost;
+		T->SetText(FText::FromString(FString::Printf(TEXT("%s x%d\n%s"), Title, Count, *UFortuneHUDWidget::FormatMoney(Cost).ToString())));
+		B->SetIsEnabled(bReady && bCan);
+	};
+	Setup(AgainBtn, AgainText, AgainCount, TEXT("TEKRAR"));
+	Setup(OtherBtn, OtherText, OtherCount, TEXT("SUMMON"));
+	if (OkBtn) OkBtn->SetIsEnabled(A >= 1.f && !bUsed);
+}
+
+void UFortuneSummonAgainBar::OnAgain()
+{
+	if (bUsed || !Chest.IsValid()) return;
+	bUsed = true;
+	if (!Chest->RepeatSummon(AgainCount)) bUsed = false;
+}
+
+void UFortuneSummonAgainBar::OnOther()
+{
+	if (bUsed || !Chest.IsValid()) return;
+	bUsed = true;
+	if (!Chest->RepeatSummon(OtherCount)) bUsed = false;
+}
+
+void UFortuneSummonAgainBar::OnOk()
+{
+	if (bUsed || !Chest.IsValid()) return;
+	bUsed = true;
+	Chest->CloseRevealAndReturn();
 }

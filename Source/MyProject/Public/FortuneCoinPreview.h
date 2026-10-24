@@ -31,6 +31,9 @@ public:
 	/** Belirli bir noktaya koy, ViewFrom'a baksin, Scale kadar buyut (vitrin odasi icin). */
 	void PlaceAt(const FVector& Location, const FVector& ViewFrom, const FVector& ViewUp, float Scale);
 
+	/** Ikon cekimi icin: donmeyi durdur, bu acida (derece) sabit dursun. */
+	void SetFixedPose(float InAngle) { bFixedPose = true; Angle = InAngle; PopIn = 1.f; }
+
 private:
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<USceneComponent> Root;
@@ -70,6 +73,7 @@ private:
 
 	float Angle = 0.f;
 	float PopIn = 0.f;
+	bool bFixedPose = false;
 	FVector SpinAxis = FVector::UpVector;
 	FQuat BaseRot = FQuat::Identity;
 };

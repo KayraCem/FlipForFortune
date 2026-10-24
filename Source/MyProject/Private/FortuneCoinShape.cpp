@@ -41,8 +41,8 @@ namespace
 					// genis elips + dilim tumsekleri + ustte sap cukuru
 					Rr = 1.f / FMath::Sqrt(FMath::Square(Ca / 0.84f) + FMath::Square(Sa / 1.f));
 					Rr *= 1.f - 0.05f * (1.f - FMath::Abs(FMath::Cos(5.f * A)));
-					const float D0 = A / 0.32f, D1 = (A - 2.f * PI) / 0.32f;
-					Rr *= 1.f - 0.13f * FMath::Exp(-D0 * D0) - 0.13f * FMath::Exp(-D1 * D1);
+					const float D0 = A / 0.42f, D1 = (A - 2.f * PI) / 0.42f;
+					Rr *= 1.f - 0.11f * FMath::Exp(-D0 * D0) - 0.11f * FMath::Exp(-D1 * D1);
 				}
 				else
 				{
@@ -133,10 +133,90 @@ namespace
 	}
 }
 
+// Saturn: kure (ust yari = yazi, alt yari = tura, doku ustten izdusum) + egik halka (bolum 2 = kenar materyali)
+static void FortuneShape_BuildSaturn(UProceduralMeshComponent* PMC, float R)
+{
+	const float Rp = R * 0.66f;
+	const int32 Slices = 48, Stacks = 14;
+	auto AddTri = [](TArray<int32>& Tri, const TArray<FVector>& V, const TArray<FVector>& N, int32 A, int32 B, int32 C)
+	{
+		// UE on yuz kurali: cross(B-A, C-A) normalin tersine baksin
+		const FVector Cr = FVector::CrossProduct(V[B] - V[A], V[C] - V[A]);
+		if (FVector::DotProduct(Cr, N[A] + N[B] + N[C]) > 0.f) Swap(B, C);
+		Tri.Add(A); Tri.Add(B); Tri.Add(C);
+	};
+	for (int32 Side = 0; Side < 2; ++Side)
+	{
+		const float Sgn = Side == 0 ? 1.f : -1.f;
+		TArray<FVector> V; TArray<int32> Tri; TArray<FVector> Nrm; TArray<FVector2D> UV; TArray<FProcMeshTangent> Tan;
+		for (int32 i = 0; i <= Stacks; ++i)
+		{
+			const float Phi = (PI * 0.5f) * i / Stacks;          // kutuptan ekvatora
+			for (int32 j = 0; j <= Slices; ++j)
+			{
+				const float Th = 2.f * PI * j / Slices;
+				const FVector D(FMath::Sin(Phi) * FMath::Cos(Th), FMath::Sin(Phi) * FMath::Sin(Th), Sgn * FMath::Cos(Phi));
+				const FVector P = D * Rp;
+				V.Add(P); Nrm.Add(D);
+				const float U = Side == 0 ? 0.5f + P.Y / (2.f * Rp) : 0.5f - P.Y / (2.f * Rp);
+				UV.Add(FVector2D(U, 0.5f - P.X / (2.f * Rp)));
+				Tan.Add(FProcMeshTangent(0.f, Sgn, 0.f));
+			}
+		}
+		for (int32 i = 0; i < Stacks; ++i)
+		{
+			for (int32 j = 0; j < Slices; ++j)
+			{
+				const int32 A = i * (Slices + 1) + j, B = A + 1, C = A + Slices + 1, D = C + 1;
+				AddTri(Tri, V, Nrm, A, C, B);
+				AddTri(Tri, V, Nrm, B, C, D);
+			}
+		}
+		PMC->CreateMeshSection(Side, V, Tri, Nrm, UV, TArray<FColor>(), Tan, false);
+	}
+	// Halka: coinin ustu (+X) ekseni etrafinda 72 derece egik, iki yuzlu
+	{
+		TArray<FVector> V; TArray<int32> Tri; TArray<FVector> Nrm; TArray<FVector2D> UV; TArray<FProcMeshTangent> Tan;
+		const FQuat Tilt(FVector::ForwardVector, FMath::DegreesToRadians(72.f));
+		const float R0 = R * 0.86f, R1 = R * 1.22f;
+		const int32 Seg = 72;
+		for (int32 Face = 0; Face < 2; ++Face)
+		{
+			const FVector N = Tilt.RotateVector(FVector(0.f, 0.f, Face == 0 ? 1.f : -1.f));
+			const int32 B0 = V.Num();
+			for (int32 j = 0; j <= Seg; ++j)
+			{
+				const float Th = 2.f * PI * j / Seg;
+				const FVector Dir(FMath::Cos(Th), FMath::Sin(Th), 0.f);
+				for (int32 k = 0; k < 2; ++k)
+				{
+					const float Rr = k == 0 ? R0 : R1;
+					V.Add(Tilt.RotateVector(Dir * Rr + FVector(0.f, 0.f, Face == 0 ? 0.03f : -0.03f)));
+					Nrm.Add(N);
+					UV.Add(FVector2D(k * 6.f, j / float(Seg)));   // kenar normal dokusu: es merkezli halka cizgileri
+					Tan.Add(FProcMeshTangent(Tilt.RotateVector(Dir), false));
+				}
+			}
+			for (int32 j = 0; j < Seg; ++j)
+			{
+				const int32 A = B0 + j * 2, B = A + 1, C = A + 2, D = A + 3;
+				AddTri(Tri, V, Nrm, A, C, B);
+				AddTri(Tri, V, Nrm, B, C, D);
+			}
+		}
+		PMC->CreateMeshSection(2, V, Tri, Nrm, UV, TArray<FColor>(), Tan, false);
+	}
+}
+
 void FFortuneCoinShapeBuilder::Build(UProceduralMeshComponent* PMC, EFortuneCoinShape Shape, float Diameter, float Thickness)
 {
 	if (!PMC) return;
 	PMC->ClearAllMeshSections();
+	if (Shape == EFortuneCoinShape::Saturn)
+	{
+		FortuneShape_BuildSaturn(PMC, Diameter * 0.5f);
+		return;
+	}
 
 	const float R = Diameter * 0.5f;
 	const float H = Thickness * 0.5f;
